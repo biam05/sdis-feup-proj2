@@ -26,7 +26,7 @@ public class Peer implements ServiceInterface {
     public Peer(String[] args){
 
         int port = Integer.parseInt(args[1]);
-        this.chord = new Chord(Integer.parseInt(args[2]));
+        //this.chord = new Chord(Integer.parseInt(args[2]));
     }
 
     @Override
