@@ -1,23 +1,19 @@
 package sdis.t1g06;
 
-import java.net.InetAddress;
-import java.net.UnknownHostException;
-
 public class Chord {
 
     protected Peer peer;
 
-    public Chord(Peer peer, InetAddress ownAddress, int ownPort, String friendAddressStr, String friendPortStr) {
+    public Chord(Peer peer, String ownAddress, int ownPort) {
         this.peer = peer;
-        InetAddress friendAddress;
+        Node node = new Node(ownAddress, ownPort);
+    }
+
+    public Chord(Peer peer, String ownAddress, int ownPort, String friendAddress, String friendPortStr) {
+        this.peer = peer;
         int friendPort;
         try {
-            friendAddress = InetAddress.getByName(friendAddressStr);
             friendPort = Integer.parseInt(friendPortStr);
-        } catch (UnknownHostException e) {
-            System.err.println( "Peer: UnknownHostException occurred for the given NodeAddress");
-            e.printStackTrace();
-            return;
         } catch (NumberFormatException e) {
             System.err.println( "Peer: NodePort given is not a number");
             e.printStackTrace();

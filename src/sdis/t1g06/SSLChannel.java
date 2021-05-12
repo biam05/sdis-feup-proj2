@@ -8,7 +8,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 
-public class SSLChannel extends Thread  {
+public class SSLChannel extends Thread {
 
     private int port;
     private SSLServerSocket socket;
@@ -36,7 +36,7 @@ public class SSLChannel extends Thread  {
         try {
             socket = (SSLServerSocket) serverSocketFactory.createServerSocket(this.port);
         } catch (IOException e) {
-            System.out.println("> Failed to Start SLLChannel : Port " + this.port);
+            System.out.println("> Failed to Start SSLChannel : Port " + this.port);
             e.printStackTrace();
             return;
         }
@@ -52,7 +52,7 @@ public class SSLChannel extends Thread  {
                 BufferedReader br = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
                 message = br.readLine();
                 out = new PrintWriter(clientSocket.getOutputStream(), true);
-                System.out.println("> SSLChannel: Got this message: " + message);
+                Peer.messageHandler(message);
             } catch(IOException e) {
                 System.err.println("> SSLChannel: Failed to receive message!");
                 e.printStackTrace();

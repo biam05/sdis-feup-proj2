@@ -1,33 +1,32 @@
 package sdis.t1g06;
 
-import java.math.BigInteger;
-import java.net.InetAddress;
-import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HashMap;
-import java.util.Objects;
 
 public class Node {
     private final long id; // key
     private Node sucessor;
     private Node predecessor;
-    private InetAddress address;
+    private String address;
     private int port;
     private HashMap<Long, Node> fingerTable;
+    private PeerChannel peerChannel;
 
-    public Node(InetAddress address, int port) {
+    public Node(String address, int port) {
         this.address = address;
         this.port = port;
-        this.id = Long.parseLong(Objects.requireNonNull(sha1(address.toString())), 16); // SHA-1 Hash of own IP address
-        join(null);
+        this.id = sha1(this.address);
+        this.peerChannel = new PeerChannel(address, port);
+        //join(null);
     }
 
-    public Node(InetAddress ownAddress, int ownPort, InetAddress friendAddress, int friendPort) {
+    public Node(String ownAddress, int ownPort, String friendAddress, int friendPort) {
         this.address = ownAddress;
         this.port = ownPort;
-        this.id = Long.parseLong(Objects.requireNonNull(sha1(ownAddress.toString())), 16); // SHA-1 Hash of own IP address
-        join(new Node(friendAddress, friendPort));
+        this.id = sha1(this.address);
+        this.peerChannel = new PeerChannel(ownAddress, ownPort, friendAddress, friendPort);
+        //join(new Node(friendAddress, friendPort));
     }
 
     /**
@@ -133,18 +132,46 @@ public class Node {
         }
     }
 
-    private String sha1(String originalString) {
-        String sha1;
+    private long sha1(String address) {
+        int sha1 = address.hashCode();
+
+        byte[] hashbytes = new byte[4];
+        hashbytes[0] = (byte) (sha1 >> 24);
+        hashbytes[1] = (byte) (sha1 >> 16);
+        hashbytes[2] = (byte) (sha1 >> 8);
+        hashbytes[3] = (byte) (sha1 /*>> 0*/);
+
+        // try to create SHA1 digest
+        MessageDigest md =  null;
         try {
-            MessageDigest md = MessageDigest.getInstance("SHA-1");
-            md.reset();
-            md.update(originalString.getBytes(StandardCharsets.UTF_8));
-            sha1 = String.format("%040x", new BigInteger(1, md.digest()));
-        } catch(NoSuchAlgorithmException e){
-            System.err.println("Node: Error in SHA-1 Hashing.");
+            md = MessageDigest.getInstance("SHA-1");
+        } catch (NoSuchAlgorithmException e) {
             e.printStackTrace();
-            return null;
         }
-        return sha1;
+
+        // successfully created SHA1 digest
+        // try to convert byte[4]
+        // -> SHA1 result byte[]
+        // -> compressed result byte[4]
+        // -> compressed result in long type
+        if (md != null) {
+            md.reset();
+            md.update(hashbytes);
+            byte[] result = md.digest();
+
+            byte[] compressed = new byte[4];
+            for (int j = 0; j < 4; j++) {
+                byte temp = result[j];
+                for (int k = 1; k < 5; k++) {
+                    temp = (byte) (temp ^ result[j+k]);
+                }
+                compressed[j] = temp;
+            }
+
+            long ret = (long) (compressed[0] & 0xFF) << 24 | (compressed[1] & 0xFF) << 16 | (compressed[2] & 0xFF) << 8 | (compressed[3] & 0xFF);
+            ret = ret& 0xFFFFFFFFL;
+            return ret;
+        }
+        return 0;
     }
 }
