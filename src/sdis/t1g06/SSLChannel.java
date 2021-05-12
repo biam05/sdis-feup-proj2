@@ -8,7 +8,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 
-public class SSLChannel implements Runnable {
+public class SSLChannel extends Thread  {
 
     private int port;
     private SSLServerSocket socket;
@@ -19,11 +19,22 @@ public class SSLChannel implements Runnable {
     public SSLChannel(int port) {
         this.port = port;
 
+        //set the type of trust store
+        System.setProperty("javax.net.ssl.trustStoreType","JKS");
+        //set the password with which the truststore is encripted
+        System.setProperty("javax.net.ssl.trustStorePassword", "12345678");
+        //set the name of the trust store containing the client public key and certificate
+        System.setProperty("javax.net.ssl.trustStore", "keys/truststore");
+        //set the password with which the server keystore is encripted
+        System.setProperty("javax.net.ssl.keyStorePassword","12345678");
+        //set the name of the keystore containing the server's private and public keys
+        System.setProperty("javax.net.ssl.keyStore","keys/keystore");
+
         // start sslchannel
         SSLServerSocketFactory serverSocketFactory;
         serverSocketFactory=(SSLServerSocketFactory) SSLServerSocketFactory.getDefault();
         try {
-            socket= (SSLServerSocket) serverSocketFactory.createServerSocket(this.port);
+            socket = (SSLServerSocket) serverSocketFactory.createServerSocket(this.port);
         } catch (IOException e) {
             System.out.println("> Failed to Start SLLChannel : Port " + this.port);
             e.printStackTrace();
@@ -33,7 +44,6 @@ public class SSLChannel implements Runnable {
         System.out.println("> Started SSLChannel : Port " + this.port);
     }
 
-
     @Override
     public void run() {
         while(true) {
@@ -42,6 +52,7 @@ public class SSLChannel implements Runnable {
                 BufferedReader br = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
                 message = br.readLine();
                 out = new PrintWriter(clientSocket.getOutputStream(), true);
+                System.out.println("> SSLChannel: Got this message: " + message);
             } catch(IOException e) {
                 System.err.println("> SSLChannel: Failed to receive message!");
                 e.printStackTrace();

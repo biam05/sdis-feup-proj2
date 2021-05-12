@@ -1,14 +1,34 @@
 package sdis.t1g06;
 
-import java.net.InetSocketAddress;
+import java.math.BigInteger;
+import java.net.InetAddress;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.HashMap;
+import java.util.Objects;
 
 public class Node {
-    private long id; // key
+    private final long id; // key
     private Node sucessor;
     private Node predecessor;
-    private InetSocketAddress address;
-    private HashMap<Integer, Node> fingerTable;
+    private InetAddress address;
+    private int port;
+    private HashMap<Long, Node> fingerTable;
+
+    public Node(InetAddress address, int port) {
+        this.address = address;
+        this.port = port;
+        this.id = Long.parseLong(Objects.requireNonNull(sha1(address.toString())), 16); // SHA-1 Hash of own IP address
+        join(null);
+    }
+
+    public Node(InetAddress ownAddress, int ownPort, InetAddress friendAddress, int friendPort) {
+        this.address = ownAddress;
+        this.port = ownPort;
+        this.id = Long.parseLong(Objects.requireNonNull(sha1(ownAddress.toString())), 16); // SHA-1 Hash of own IP address
+        join(new Node(friendAddress, friendPort));
+    }
 
     /**
      * ask node to find id's successor
@@ -51,7 +71,7 @@ public class Node {
      * @return closest finger preceding id
      */
     public Node closest_preceding_finger(long id) {
-        for(int i = Settings.CHORD_MBITS; i >= 1; i--) {
+        for(long i = Settings.CHORD_MBITS; i >= 1; i--) {
             if(fingerTable.get(i).id == id)
                 return fingerTable.get(i);
         }
@@ -67,7 +87,7 @@ public class Node {
             init_finger_table(node);
             update_others();
         } else { // I'm the first one
-            for(int i = 1; i <= Settings.CHORD_MBITS; i++) {
+            for(long i = 1; i <= Settings.CHORD_MBITS; i++) {
                 fingerTable.put(i, this);
             }
             predecessor = this;
@@ -79,10 +99,10 @@ public class Node {
      * @param node arbitrary node already in the network
      */
     public void init_finger_table(Node node) {
-        fingerTable.put(1, node.find_sucessor(fingerTable.get(1).id));
+        fingerTable.put(1L, node.find_sucessor(fingerTable.get(1L).id));
         predecessor = sucessor.predecessor;
         sucessor.predecessor = this;
-        for(int i = 1; i < Settings.CHORD_MBITS; i++) {
+        for(long i = 1; i < Settings.CHORD_MBITS; i++) {
             if(fingerTable.get(i+1).id >= node.id || fingerTable.get(i+1).id <= fingerTable.get(i).id)
                 fingerTable.put(i+1, fingerTable.get(i));
             else
@@ -105,11 +125,26 @@ public class Node {
      * @param node that will be used to update
      * @param i position of the finger in relation to myself
      */
-    private void update_finger_table(Node node, int i) {
+    private void update_finger_table(Node node, long i) {
         if(node.id >= this.id || node.id <= fingerTable.get(i).id) {
             fingerTable.put(i, node);
             Node p = predecessor;
             p.update_finger_table(node, i);
         }
+    }
+
+    private String sha1(String originalString) {
+        String sha1;
+        try {
+            MessageDigest md = MessageDigest.getInstance("SHA-1");
+            md.reset();
+            md.update(originalString.getBytes(StandardCharsets.UTF_8));
+            sha1 = String.format("%040x", new BigInteger(1, md.digest()));
+        } catch(NoSuchAlgorithmException e){
+            System.err.println("Node: Error in SHA-1 Hashing.");
+            e.printStackTrace();
+            return null;
+        }
+        return sha1;
     }
 }
