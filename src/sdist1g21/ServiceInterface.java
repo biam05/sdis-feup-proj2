@@ -1,4 +1,4 @@
-package sdis.t1g06;
+package sdist1g21;
 
 public interface ServiceInterface {
     String backup(String file_name, int replicationDegree);

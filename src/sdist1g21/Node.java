@@ -1,4 +1,4 @@
-package sdis.t1g06;
+package sdist1g21;
 
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
