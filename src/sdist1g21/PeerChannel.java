@@ -11,11 +11,22 @@ import java.util.concurrent.Future;
 public class PeerChannel extends Thread {
     AsynchronousServerSocketChannel ownChannel;
     AsynchronousSocketChannel clientChannel;
+    String ownAddress;
+    int ownPort;
+    String friendAddress;
+    int friendPort;
 
-    public PeerChannel(String address, int port) {
+    public PeerChannel(String ownAddress, int ownPort, String friendAddress, int friendPort) {
+        this.ownAddress=ownAddress;
+        this.ownPort=ownPort;
+        this.friendAddress=friendAddress;
+        this.friendPort=friendPort;
+    }
+
+    public void serverChannel() {
         try {
             ownChannel = AsynchronousServerSocketChannel.open();
-            InetSocketAddress hostAddress = new InetSocketAddress(address, port);
+            InetSocketAddress hostAddress = new InetSocketAddress(ownAddress, ownPort);
             ownChannel.bind(hostAddress);
 
             System.out.println("Created AsynchronousServerSocketChannel at: " + hostAddress);
@@ -41,7 +52,7 @@ public class PeerChannel extends Thread {
         }
     }
 
-    public PeerChannel(String ownAddress, int ownPort, String friendAddress, int friendPort) {
+    public void clientChannel() {
         try {
             AsynchronousSocketChannel client = AsynchronousSocketChannel.open();
 
@@ -67,8 +78,7 @@ public class PeerChannel extends Thread {
 
     @Override
     public void run() {
-        while(true) {
-
-        }
+        serverChannel();
+        if(!(ownAddress.equals(friendAddress) && ownPort == friendPort)) clientChannel();
     }
 }

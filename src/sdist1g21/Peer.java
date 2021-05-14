@@ -3,22 +3,23 @@ package sdist1g21;
 public class Peer implements ServiceInterface {
 
     /*
-    Peer 1 args: 127.0.0.1 8000 5001
-    Peer 2 args: 230.0.0.1 5002 127.0.0.1 8000
+    TestApp args: 127.0.0.1 5001 REGISTER ipteste dnsteste
+    Peer 1 args: 5001 127.0.0.1 8000
+    Peer 2 args: 5001 230.0.0.1 5002 127.0.0.1 8000
      */
 
     private static SSLChannel sslChannel;
 
     private static Peer instance;
-    private String address;
-    private int chordPort, SSLPort;
+    private String ownAddress, friendAddress;
+    private int ownPort, friendPort, SSLPort;
 
     private Chord chord;
 
     public static void main(String[] args) {
         // check usage
-        if (args.length < 3) {
-            System.out.println("Usage: java Peer NodeAddress NodePort [SSLPort] [FriendNodeAddress FriendNodePort]");
+        if (args.length != 3 && args.length != 5) {
+            System.out.println("Usage: java Peer SSLPort NodeAddress NodePort [FriendNodeAddress FriendNodePort]");
             return;
         }
 
@@ -26,33 +27,34 @@ public class Peer implements ServiceInterface {
     }
 
     public Peer(String[] args){
-        if(args.length == 3) {
-            try {
-                address = args[0];
-                chordPort = Integer.parseInt(args[1]);
-                SSLPort = Integer.parseInt(args[2]);
-            } catch (NumberFormatException e) {
-                System.err.println( "Peer: NodePort given is not a number");
-                e.printStackTrace();
-                return;
-            }
-
-            sslChannel = new SSLChannel(SSLPort);
-            sslChannel.start();
-
-            chord = new Chord(instance, address, chordPort);
-        } else {
-            try {
-                address = args[0];
-                chordPort = Integer.parseInt(args[1]);
-            } catch (NumberFormatException e) {
-                System.err.println( "Peer: NodePort given is not a number");
-                e.printStackTrace();
-                return;
-            }
-
-            chord = new Chord(instance, address, chordPort, args[2], args[3]);
+        try {
+            SSLPort = Integer.parseInt(args[0]);
+            ownAddress = args[1];
+            ownPort = Integer.parseInt(args[2]);
+        } catch (NumberFormatException e) {
+            System.err.println( "Peer: One of the ports given is not a number");
+            e.printStackTrace();
+            return;
         }
+
+        if(args.length == 5) {
+            try {
+                friendAddress = args[3];
+                friendPort = Integer.parseInt(args[4]);
+            } catch (NumberFormatException e) {
+                System.err.println("Peer: friendPort given is not a number");
+                e.printStackTrace();
+                return;
+            }
+        } else {
+            friendAddress = ownAddress;
+            friendPort = ownPort;
+        }
+
+        sslChannel = new SSLChannel(SSLPort);
+        sslChannel.start();
+
+        chord = new Chord(instance, ownAddress, ownPort, friendAddress, friendPort);
     }
 
     public static void messageHandler(String message) {
