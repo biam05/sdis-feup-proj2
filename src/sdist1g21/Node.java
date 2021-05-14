@@ -19,8 +19,8 @@ public class Node {
         this.id = sha1(this.address);
         this.peerChannel = new PeerChannel(ownAddress, ownPort, friendAddress, friendPort);
         this.peerChannel.start();
-        if(!(ownAddress.equals(friendAddress) && ownPort == friendPort)) join(this);
-        else join(null);
+        //if(!(ownAddress.equals(friendAddress) && ownPort == friendPort)) join(this);
+        //else join(null);
     }
 
     /**

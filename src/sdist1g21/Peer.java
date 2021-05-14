@@ -5,7 +5,7 @@ public class Peer implements ServiceInterface {
     /*
     TestApp args: 127.0.0.1 5001 REGISTER ipteste dnsteste
     Peer 1 args: 5001 127.0.0.1 8000
-    Peer 2 args: 5001 230.0.0.1 5002 127.0.0.1 8000
+    Peer 2 args: 5002 230.0.0.1 5003 127.0.0.1 8000
      */
 
     private static SSLChannel sslChannel;
