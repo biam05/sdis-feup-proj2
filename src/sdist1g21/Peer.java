@@ -11,6 +11,9 @@ public class Peer implements ServiceInterface {
     private static SSLChannel sslChannel;
 
     private static Peer instance;
+
+    private PeerContainer peerContainer;
+
     private String ownAddress, friendAddress;
     private int ownPort, friendPort, SSLPort;
 

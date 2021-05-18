@@ -4,7 +4,8 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 
 public class Utils {
-    public static final int MAX_THREADS = 200;
+    public static final int MAX_THREADS = 20;
+    public static final int MAX_BYTE_MSG = 1024;
     public static final int MAX_STORAGE_SPACE = 10000000;
     public static final int CHORD_MBITS = 128; // number of bits in the key/node indentifiers
 

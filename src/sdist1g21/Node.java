@@ -10,7 +10,7 @@ public class Node {
     private Node predecessor;
     private String address;
     private int port;
-    private HashMap<Long, Node> fingerTable;
+    private HashMap<Long, Node> fingerTable = new HashMap<>();
     private PeerChannel peerChannel;
 
     public Node(String ownAddress, int ownPort, String friendAddress, int friendPort) {
@@ -19,8 +19,9 @@ public class Node {
         this.id = sha1(this.address);
         this.peerChannel = new PeerChannel(ownAddress, ownPort, friendAddress, friendPort);
         this.peerChannel.start();
-        //if(!(ownAddress.equals(friendAddress) && ownPort == friendPort)) join(this);
-        //else join(null);
+        /*if(!(ownAddress.equals(friendAddress) && ownPort == friendPort)) join(this);
+        else join(null);
+        System.out.println("This is my fingertable: " + fingerTable.toString());*/
     }
 
     /**
@@ -77,6 +78,7 @@ public class Node {
      */
     public void join(Node node) {
         if(node != null){ // Join table through my friend "node"
+            sucessor = node;
             init_finger_table(node);
             update_others();
         } else { // I'm the first one
@@ -84,6 +86,7 @@ public class Node {
                 fingerTable.put(i, this);
             }
             predecessor = this;
+            sucessor = this;
         }
     }
 
@@ -92,7 +95,7 @@ public class Node {
      * @param node arbitrary node already in the network
      */
     public void init_finger_table(Node node) {
-        fingerTable.put(1L, node.find_successor(fingerTable.get(1L).id));
+        fingerTable.put(1L, node.find_successor((long) ((id + 1) % Math.pow(2, Utils.CHORD_MBITS))));
         predecessor = sucessor.predecessor;
         sucessor.predecessor = this;
         for(long i = 1; i < Utils.CHORD_MBITS; i++) {

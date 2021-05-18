@@ -5,16 +5,21 @@ import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.AsynchronousServerSocketChannel;
 import java.nio.channels.AsynchronousSocketChannel;
+import java.util.Scanner;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
 
 public class PeerChannel extends Thread {
     AsynchronousServerSocketChannel ownChannel;
-    AsynchronousSocketChannel clientChannel;
+    AsynchronousSocketChannel clientChannel, friendChannel;
     String ownAddress;
     int ownPort;
     String friendAddress;
     int friendPort;
+
+    ScheduledThreadPoolExecutor peerChannelServerExecutors = new ScheduledThreadPoolExecutor(Utils.MAX_THREADS);
+    ScheduledThreadPoolExecutor peerChannelClientExecutors = new ScheduledThreadPoolExecutor(Utils.MAX_THREADS);
 
     public PeerChannel(String ownAddress, int ownPort, String friendAddress, int friendPort) {
         this.ownAddress=ownAddress;
@@ -29,56 +34,88 @@ public class PeerChannel extends Thread {
             InetSocketAddress hostAddress = new InetSocketAddress(ownAddress, ownPort);
             ownChannel.bind(hostAddress);
 
-            System.out.println("Created AsynchronousServerSocketChannel at: " + hostAddress);
+            System.out.println("PeerChannel: Successfully established the server connection at: " + hostAddress);
 
             Future<AsynchronousSocketChannel> acceptResult = ownChannel.accept();
             clientChannel = acceptResult.get();
 
             while(true) {
-                ByteBuffer buffer = ByteBuffer.allocate(32);
+                ByteBuffer buffer = ByteBuffer.allocate(Utils.MAX_BYTE_MSG);
                 Future<Integer> result = clientChannel.read(buffer);
-                while (!result.isDone()) {}
 
-                buffer.flip();
+                result.get();
+
                 String message = new String(buffer.array()).trim();
-                System.out.println(message);
-                if (message.equals("Bye.")) {
-                    break;
-                }
+                peerChannelServerExecutors.execute(() -> handlePeerMessage(message));
                 buffer.clear();
             }
-        } catch (IOException | ExecutionException | InterruptedException e) {
+        } catch (ExecutionException e) {
+            try {
+                ownChannel.close();
+            } catch (IOException ioException) {
+                System.err.println("PeerChannel exception: Failed to close the server connection");
+                e.printStackTrace();
+            }
+            peerChannelServerExecutors.execute(this::serverChannel);
+        } catch (IOException | InterruptedException e) {
+            System.err.println("PeerChannel exception: Failed to establish the server connection");
             e.printStackTrace();
         }
     }
 
-    public void clientChannel() {
+    private void handlePeerMessage(String msg) {
+        System.out.println("Got message: " + msg);
+    }
+
+    private void clientChannel() {
         try {
-            AsynchronousSocketChannel client = AsynchronousSocketChannel.open();
+            friendChannel = AsynchronousSocketChannel.open();
 
             InetSocketAddress hostAddress = new InetSocketAddress(friendAddress, friendPort);
 
-            Future<Void> future = client.connect(hostAddress);
+            Future<Void> future = friendChannel.connect(hostAddress);
             future.get();
 
-            System.out.println("Connected AsynchronousServerSocketChannel at: " + hostAddress);
+            System.out.println("PeerChannel: Successfully established the client connection at: " + hostAddress);
+        } catch (IOException | InterruptedException | ExecutionException e) {
+            System.err.println("PeerChannel exception: Failed to establish the client connection");
+            e.printStackTrace();
+        }
 
-            String [] messages = new String [] {"Time goes fast.", "What now?", "Bye."};
+        sendMessageToFriend("Let's test!");
+    }
 
-            for (String s : messages) {
-                byte[] message = s.getBytes();
-                ByteBuffer buffer = ByteBuffer.wrap(message);
-                Future<Integer> result = client.write(buffer);
-                System.out.println("Sent " + result.get() + " bytes");
+    private void sendMessageToFriend(String message) {
+        if(!friendChannel.isOpen()) {
+            System.err.println("PeerChannel exception: Failed to send message because friend channel connection is inactive");
+            return;
+        }
+        try {
+            byte[] msgbytes = message.getBytes();
+            ByteBuffer buffer = ByteBuffer.wrap(msgbytes);
+            Future<Integer> result = friendChannel.write(buffer);
+            System.out.println("Sent " + result.get() + " bytes");
+            buffer.clear();
+            Scanner userInput = new Scanner(System.in);
+            while(true) {
+                System.out.println("Send next message: ");
+
+                String input = userInput.nextLine();
+                System.out.println("input is '" + input + "'");
+
+                if (!input.isEmpty()) {
+                    sendMessageToFriend(input);
+                }
             }
-        } catch (IOException | ExecutionException | InterruptedException e) {
+        } catch (InterruptedException | ExecutionException e) {
+            System.err.println("PeerChannel exception: Failed to send message to friend");
             e.printStackTrace();
         }
     }
 
     @Override
     public void run() {
-        serverChannel();
-        if(!(ownAddress.equals(friendAddress) && ownPort == friendPort)) clientChannel();
+        peerChannelServerExecutors.execute(this::serverChannel);
+        if(!(ownAddress.equals(friendAddress) && ownPort == friendPort)) peerChannelClientExecutors.execute(this::clientChannel);
     }
 }

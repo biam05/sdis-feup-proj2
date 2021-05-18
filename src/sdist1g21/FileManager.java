@@ -77,13 +77,39 @@ public class FileManager {
      *
      * Reutilized from Project 1
      */
-    private synchronized String id() {
+    private synchronized String id(){
         String filename = this.file.getName();                      // file name
         String filedate = String.valueOf(this.file.lastModified()); // date modified
         String fileowner = this.file.getParent();                   // owner
 
         String originalString = filename + ":" + filedate + ":" + fileowner;
-        return Utils.sha256(originalString); // sha-256 encryption
+        return sha256(originalString); // sha-256 encryption
+    }
+
+    /**
+     * SHA256 Encoding Function
+     * @param originalString Orignal String before encoding
+     * @return String after Encoding
+     *
+     * Reutilized from Project 1
+     */
+    private synchronized static String sha256(String originalString){
+        try{
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            byte[] hash = md.digest(originalString.getBytes(StandardCharsets.UTF_8));
+            StringBuilder hexString = new StringBuilder();
+            // convert a byte array to a string of hex digits
+            for (byte b : hash) {
+                String hex = Integer.toHexString(0xff & b);
+                if (hex.length() == 1) hexString.append('0'); // 1 digit hexadecimal
+                hexString.append(hex);
+            }
+            return hexString.toString();
+
+        }catch(Exception e){
+            System.err.println("Error in SHA-256 Encryptation.\n");
+            throw new RuntimeException(e);
+        }
     }
 
     /**
