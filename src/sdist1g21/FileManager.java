@@ -2,6 +2,7 @@ package sdist1g21;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.Serializable;
 import java.nio.ByteBuffer;
 import java.nio.channels.AsynchronousFileChannel;
 import java.nio.charset.StandardCharsets;
@@ -10,7 +11,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.security.MessageDigest;
 
-public class FileManager {
+public class FileManager implements Serializable {
 
     private final String fileID;
     private final File file;

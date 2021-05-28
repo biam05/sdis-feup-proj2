@@ -5,23 +5,23 @@ import java.security.NoSuchAlgorithmException;
 import java.util.HashMap;
 
 public class Node {
-    private final long id; // key
+    private final long key; // key
     private Node sucessor;
     private Node predecessor;
     private String address;
-    private int port;
+    private int port, nodeID;
     private HashMap<Long, Node> fingerTable = new HashMap<>();
     private PeerChannel peerChannel;
 
-    public Node(String ownAddress, int ownPort, String friendAddress, int friendPort) {
+    public Node(String ownAddress, int ownPort, int nodeID, String friendAddress, int friendPort) {
         this.address = ownAddress;
         this.port = ownPort;
-        this.id = sha1(this.address);
-        this.peerChannel = new PeerChannel(ownAddress, ownPort, friendAddress, friendPort);
-        this.peerChannel.start();
-        /*if(!(ownAddress.equals(friendAddress) && ownPort == friendPort)) join(this);
-        else join(null);
-        System.out.println("This is my fingertable: " + fingerTable.toString());*/
+        this.nodeID = nodeID;
+        this.key = sha1(this.address);
+        //this.peerChannel = new PeerChannel(ownAddress, ownPort, friendAddress, friendPort);
+        //this.peerChannel.start();
+        //if(!(ownAddress.equals(friendAddress) && ownPort == friendPort)) join(this);
+        //else join(null);
     }
 
     /**
@@ -53,7 +53,7 @@ public class Node {
      */
     public Node find_predecessor(long id) {
         Node node = this;
-        while(id != node.id || id != node.sucessor.id) {
+        while(id != node.key || id != node.sucessor.key) {
             node = closest_preceding_finger(id);
         }
         return node;
@@ -66,7 +66,7 @@ public class Node {
      */
     public Node closest_preceding_finger(long id) {
         for(long i = Utils.CHORD_MBITS; i >= 1; i--) {
-            if(fingerTable.get(i).id == id)
+            if(fingerTable.get(i).key == id)
                 return fingerTable.get(i);
         }
         return this;
@@ -95,14 +95,14 @@ public class Node {
      * @param node arbitrary node already in the network
      */
     public void init_finger_table(Node node) {
-        fingerTable.put(1L, node.find_successor((long) ((id + 1) % Math.pow(2, Utils.CHORD_MBITS))));
+        fingerTable.put(1L, node.find_successor((long) ((key + 1) % Math.pow(2, Utils.CHORD_MBITS))));
         predecessor = sucessor.predecessor;
         sucessor.predecessor = this;
         for(long i = 1; i < Utils.CHORD_MBITS; i++) {
-            if(fingerTable.get(i+1).id >= node.id || fingerTable.get(i+1).id <= fingerTable.get(i).id)
+            if(fingerTable.get(i+1).key >= node.key || fingerTable.get(i+1).key <= fingerTable.get(i).key)
                 fingerTable.put(i+1, fingerTable.get(i));
             else
-                fingerTable.put(i+1, node.find_successor(fingerTable.get(i+1).id));
+                fingerTable.put(i+1, node.find_successor(fingerTable.get(i+1).key));
         }
     }
 
@@ -111,7 +111,7 @@ public class Node {
      */
     public void update_others() {
         for(int i = 1; i <= Utils.CHORD_MBITS; i++) {
-            Node p = find_predecessor((long) (this.id - (Math.pow(2, i-1))));
+            Node p = find_predecessor((long) (this.key - (Math.pow(2, i-1))));
             p.update_finger_table(this, i);
         }
     }
@@ -122,7 +122,7 @@ public class Node {
      * @param i position of the finger in relation to myself
      */
     private void update_finger_table(Node node, long i) {
-        if(node.id >= this.id || node.id <= fingerTable.get(i).id) {
+        if(node.key >= this.key || node.key <= fingerTable.get(i).key) {
             fingerTable.put(i, node);
             Node p = predecessor;
             p.update_finger_table(node, i);

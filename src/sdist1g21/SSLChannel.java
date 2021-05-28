@@ -14,7 +14,7 @@ public class SSLChannel extends Thread {
     private SSLServerSocket socket;
     private SSLSocket clientSocket;
     private String message;
-    private PrintWriter out;
+    private static PrintWriter out;
 
     public SSLChannel(int port) {
         this.port = port;
@@ -61,7 +61,7 @@ public class SSLChannel extends Thread {
         }
     }
 
-    public void sendMessage(String message) {
+    public static void sendMessageToClient(String message) {
         out.println(message);
     }
 }

@@ -8,14 +8,14 @@ import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.util.Locale;
 
 
 public class TestApp {
     public static void main(String[] args) throws IOException {
-        if (args.length < 4) {
-            System.err.println(
-                    "Usage: java TestApp <host> <port> <oper> <opnd>*");
-            System.exit(1);
+        if (args.length < 2) {
+            System.err.println("Usage: java TestApp <peerAddress> <peerPort> <sub_protocol> <opnds>");
+            return;
         }
 
         //set the type of trust store
@@ -29,9 +29,15 @@ public class TestApp {
         //set the name of the keystore containing the client's private and public keys
         System.setProperty("javax.net.ssl.keyStore","keys/keystore");
 
-        String reqStr, response = "ERROR";
-        String hostName = args[0];
-        int portNumber = Integer.parseInt(args[1]);
+        String request, response = "ERROR";
+        String peerAddress = args[0];
+        int peerPort;
+        try {
+            peerPort = Integer.parseInt(args[1]);
+        } catch (NumberFormatException e) {
+            System.err.println( "Peer: The port given is not a number!");
+            return;
+        }
         SSLSocket clientSocket;
         SSLSocketFactory sf;
         sf = (SSLSocketFactory) SSLSocketFactory.getDefault();
@@ -40,13 +46,13 @@ public class TestApp {
 
         try {
             // build Socket
-            clientSocket = (SSLSocket) sf.createSocket(InetAddress.getByName(hostName), portNumber);
+            clientSocket = (SSLSocket) sf.createSocket(InetAddress.getByName(peerAddress), peerPort);
             // get OutputStream
             out = new PrintWriter(clientSocket.getOutputStream(), true);
             // get InputStream
             in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
         } catch (UnknownHostException e) {
-            System.err.println("Don't know about host " + hostName);
+            System.err.println("Don't know about host " + peerAddress);
             System.exit(1);
             return;
         } catch( IOException e) {
@@ -55,10 +61,71 @@ public class TestApp {
             return;
         }
 
+        clientSocket.startHandshake();
+
         // prepare and send request
-        reqStr = buildReqString(args);
-        out.println(reqStr);
-        System.out.println("SSLClient: Request \"" + reqStr + "\" sent!");
+        request = args[2];
+
+        // Different Commands
+        switch (request.toUpperCase(Locale.ROOT)) {
+            // Backup a File
+            case "BACKUP" -> {
+                System.out.println("> TestApp: BACKUP Operation");
+                if (args.length != 5) {
+                    System.err.println("Wrong number of arguments given for BACKUP operation");
+                    return;
+                }
+                String file_name = args[3];
+                int replicationDegree;
+                try {
+                    replicationDegree = Integer.parseInt(args[4]);
+                } catch (NumberFormatException e) {
+                    System.err.println("Replication degree given is not a number!");
+                    return;
+                }
+                out.println(request.toUpperCase(Locale.ROOT) + ":" + file_name + ":" + replicationDegree);
+            }
+            // Restore a File
+            case "RESTORE" -> {
+                System.out.println("> TestApp: RESTORE Operation");
+                if (args.length != 4) {
+                    System.err.println("Wrong number of arguments given for RESTORE operation");
+                    return;
+                }
+                String file_name = args[2];
+                out.println(request.toUpperCase(Locale.ROOT) + ":" + file_name);
+            }
+            // Delete a File
+            case "DELETE" -> {
+                System.out.println("> TestApp: DELETE Operation");
+                if (args.length != 4) {
+                    System.err.println("Wrong number of arguments given for DELETE operation");
+                    return;
+                }
+                String file_name = args[2];
+                out.println(request.toUpperCase(Locale.ROOT) + ":" + file_name);
+            }
+            // Reclaim Space
+            case "RECLAIM" -> {
+                System.out.println("> TestApp: RECLAIM Operation");
+                if (args.length != 4){
+                    System.err.println("Wrong number of arguments given for RECLAIM operation");
+                    return;
+                }
+                int space = Integer.parseInt(args[2]);
+                out.println(request.toUpperCase(Locale.ROOT) + ":" + space);
+            }
+            // Get Internal State
+            case "STATE" -> {
+                System.out.println("> TestApp: STATE Operation");
+                if (args.length != 3){
+                    System.err.println("Wrong number of arguments given for STATE operation");
+                    return;
+                }
+                out.println(request.toUpperCase(Locale.ROOT));
+            }
+            default -> System.err.println("TestApp: Invalid operation requested");
+        }
 
         try {
             response = in.readLine();
@@ -70,15 +137,6 @@ public class TestApp {
         System.out.println("SSLClient: " + args[2] + " " + args[3] + " : " + response);
 
         clientSocket.close();
-    }
-
-    protected static String buildReqString(String[] args){
-        StringBuilder reqStr = new StringBuilder();
-        for(int i = 2; i < args.length; i++){
-            reqStr.append(args[i]).append(" ");
-        }
-        return reqStr.toString();
-
     }
 }
 
