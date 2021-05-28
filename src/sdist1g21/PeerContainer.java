@@ -8,6 +8,8 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 
 public class PeerContainer implements Serializable {
     private int peerID;
+    private String peerAddress;
+    private int peerPort;
     private ArrayList<FileManager> storedFiles;
 
     private long maxSpace;
@@ -15,8 +17,10 @@ public class PeerContainer implements Serializable {
 
     private static final ScheduledThreadPoolExecutor peerContainerExecutors = new ScheduledThreadPoolExecutor(Utils.MAX_THREADS);
 
-    public PeerContainer(int peerID) {
+    public PeerContainer(int peerID, String peerAddress, int peerPort) {
         this.peerID = peerID;
+        this.peerAddress = peerAddress;
+        this.peerPort = peerPort;
         storedFiles = new ArrayList<>();
         this.maxSpace = this.freeSpace = Utils.MAX_STORAGE_SPACE;
     }
@@ -103,5 +107,13 @@ public class PeerContainer implements Serializable {
 
     public long getFreeSpace() {
         return freeSpace;
+    }
+
+    public String getPeerAdress() {
+        return peerAddress;
+    }
+
+    public long getPeerPort() {
+        return peerPort;
     }
 }

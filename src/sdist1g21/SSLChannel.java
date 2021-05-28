@@ -14,7 +14,6 @@ public class SSLChannel extends Thread {
     private SSLServerSocket socket;
     private SSLSocket clientSocket;
     private String message;
-    private static PrintWriter out;
 
     public SSLChannel(int port) {
         this.port = port;
@@ -51,17 +50,12 @@ public class SSLChannel extends Thread {
                 clientSocket = (SSLSocket) socket.accept();
                 BufferedReader br = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
                 message = br.readLine();
-                out = new PrintWriter(clientSocket.getOutputStream(), true);
-                Peer.messageHandler(message);
+                Peer.messageFromTestAppHandler(message);
             } catch(IOException e) {
                 System.err.println("> SSLChannel: Failed to receive message!");
                 e.printStackTrace();
                 return;
             }
         }
-    }
-
-    public static void sendMessageToClient(String message) {
-        out.println(message);
     }
 }

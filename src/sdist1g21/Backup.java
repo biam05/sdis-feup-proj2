@@ -1,4 +1,4 @@
-package sdist1g21;
+package sdis.t1g06;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.AsynchronousFileChannel;
@@ -9,33 +9,33 @@ import java.nio.file.StandardOpenOption;
  * Backup Class
  */
 public class Backup {
-    /*private final String filename;
-    private final byte[] content;
-    private final int pID;*/
+    private String filename;
+    private byte[] content;
+    private int pID;
 
     /**
      * Backup Constructor
      */
-    public Backup(){
-        /*this.fileId = chunk.getFileID();
-        this.chunkNo = chunk.getChunkNo();
-        this.content = chunk.getContent();
-        this.pID = pId;*/
+    public Backup(String filename, byte[] filecontent){
+        this.filename=filename;
+        this.content = filecontent;
     }
 
     /**
-     * Function used to perform the backup of a chunk
+     * Function used to perform the backup of a file
      */
     public synchronized void performBackup() {
-        /*try {
-            Path path = Path.of("peer " + pID + "\\" + "chunks\\" + fileId + "_" + chunkNo);
+        try {
+            Path path = Path.of("peer " + pID + "/" + "files/" + filename); //?
             AsynchronousFileChannel fileChannel = AsynchronousFileChannel.open(path, StandardOpenOption.CREATE, StandardOpenOption.WRITE);
             fileChannel.write(ByteBuffer.wrap(content), 0);
             fileChannel.close();
-            System.out.println("> Peer " + pID + ": saved chunk nº" + chunkNo + " of file with fileID: " + fileId);
+            System.out.println("> Peer " + pID + ": saved file" + filename );
         } catch (IOException e) {
-            System.err.println("> Peer " + pID + " exception: failed to save chunk " +  chunkNo);
+            System.err.println("> Peer " + pID + " exception: failed to save file " +  filename);
             e.printStackTrace();
-        }*/
+        }
+
+        //SEND STORED ?
     }
 }

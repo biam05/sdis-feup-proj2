@@ -11,8 +11,8 @@ public class Peer implements ServiceInterface {
     /* For testing purposes, the SSLPort has to be different on all peers. In reality, this shouldn't be a problem because each peer is a different PC
     *
     * TestApp args: 127.0.0.1 500(peerID) <sub_protocol> <opnds>
-    * Main peer args: 127.0.0.1 8000
-    * Other peers args: peerID 5000 127.0.0.1 8000
+    * Main peer args: 127.0.0.1 8001
+    * Other peers args: peerID 230.0.0.(peerID) 600(peerID) 5000 127.0.0.1 8001
     *
     */
 
@@ -22,17 +22,17 @@ public class Peer implements ServiceInterface {
 
     private PeerContainer peerContainer;
 
-    private PeerChannel peerChannel;
+    private PeerChannel peerToMainChannel, peerToPeerChannel;
 
-    private String mainPeerAddress;
-    private int mainPeerPort;
+    private String mainPeerAddress, peerAddress;
+    private int mainPeerPort, peerPort;
     private static int peerID;
     private int SSLPort;
 
     public static void main(String[] args) {
         // check usage
-        if (args.length != 4) {
-            System.out.println("Usage: java Peer PeerID SSLPort MainPeerAddress MainPeerPort");
+        if (args.length != 6) {
+            System.out.println("Usage: java Peer PeerID PeerAddress PeerPort SSLPort MainPeerAddress MainPeerPort");
             return;
         }
 
@@ -42,9 +42,11 @@ public class Peer implements ServiceInterface {
     public Peer(String[] args){
         try {
             peerID = Integer.parseInt(args[0]);
-            SSLPort = Integer.parseInt(args[1]) + peerID;
-            mainPeerAddress = args[2];
-            mainPeerPort = Integer.parseInt(args[3]);
+            peerAddress = args[1];
+            peerPort = Integer.parseInt(args[2]);
+            SSLPort = Integer.parseInt(args[3]) + peerID;
+            mainPeerAddress = args[4];
+            mainPeerPort = Integer.parseInt(args[5]);
         } catch (NumberFormatException e) {
             System.err.println( "Peer: Either one of the ports or the peerID given is not a number!");
             return;
@@ -53,15 +55,19 @@ public class Peer implements ServiceInterface {
         sslChannel = new SSLChannel(SSLPort);
         sslChannel.start();
 
-        peerChannel = new PeerChannel(peerID, false, mainPeerAddress, mainPeerPort);
-        peerChannel.start();
+        peerContainer = new PeerContainer(peerID, peerAddress, peerPort);
 
-        peerContainer = new PeerContainer(peerID);
+        peerToMainChannel = new PeerChannel(peerID, false, mainPeerAddress, mainPeerPort, peerContainer);
+        peerToMainChannel.start();
+
+        peerToPeerChannel = new PeerChannel(peerID, true, peerAddress, peerPort, null);
+        peerToPeerChannel.start();
+
         createDirectories();
         startAutoSave();
     }
 
-    public static void messageHandler(String message) {
+    public static void messageFromTestAppHandler(String message) {
         System.out.println("This peer got the message: " + message);
         String[] msg = message.split(":");
         String filename;
@@ -102,6 +108,7 @@ public class Peer implements ServiceInterface {
             default -> System.err.println("> Peer " + peerID + " got the following basic message: " + message);
         }
     }
+
 
     /**
      * Function used to create Peer Directories
@@ -145,10 +152,10 @@ public class Peer implements ServiceInterface {
         }
         String[] args = {String.valueOf(peerID), "BACKUP", file_name, String.valueOf(replicationDegree), String.valueOf(filemanager.getFile().length())};
         String message = formMessage(args);
-        String response = peerChannel.sendMessageToMain(message);
+        String response = peerToMainChannel.sendMessageToMain(message, null);
         System.out.println("RESPONSE: " + response);
 
-        Backup backup = new Backup();
+       // peerChannel.sendMessageToPeer( filename, file_content );
 
         return "null;";
     }
