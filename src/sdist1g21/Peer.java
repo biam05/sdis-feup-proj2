@@ -1,8 +1,15 @@
 package sdist1g21;
 
+import jdk.jshell.execution.Util;
+
+import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Locale;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
@@ -57,17 +64,17 @@ public class Peer implements ServiceInterface {
 
         peerContainer = new PeerContainer(peerID, peerAddress, peerPort);
 
-        peerToMainChannel = new PeerChannel(peerID, false, mainPeerAddress, mainPeerPort, peerContainer);
+        peerToMainChannel = new PeerChannel(peerID, false, false, mainPeerAddress, mainPeerPort, peerContainer);
         peerToMainChannel.start();
 
-        peerToPeerChannel = new PeerChannel(peerID, true, peerAddress, peerPort, null);
+        peerToPeerChannel = new PeerChannel(peerID, false, true, peerAddress, peerPort, null);
         peerToPeerChannel.start();
 
         createDirectories();
         startAutoSave();
     }
 
-    public static void messageFromTestAppHandler(String message) {
+    public static String messageFromTestAppHandler(String message) {
         System.out.println("This peer got the message: " + message);
         String[] msg = message.split(":");
         String filename;
@@ -77,11 +84,11 @@ public class Peer implements ServiceInterface {
             case "BACKUP" -> {
                 if (msg.length < 3) {
                     System.err.println("> Peer " + peerID + " exception: invalid message received");
-                    return;
+                    return "error";
                 }
                 filename = msg[1];
                 rep_deg = Integer.parseInt(msg[2]);
-                peer.backup(filename, rep_deg);
+                return peer.backup(filename, rep_deg);
             }
             case "RESTORE" -> {
                 filename = msg[1];
@@ -107,6 +114,66 @@ public class Peer implements ServiceInterface {
             case "STATE" -> peer.state();
             default -> System.err.println("> Peer " + peerID + " got the following basic message: " + message);
         }
+        return "error";
+    }
+
+    static ConcurrentHashMap<String, Integer> backupOps = new ConcurrentHashMap<>();
+    static ConcurrentHashMap<String, byte[]> backupOpFiles = new ConcurrentHashMap<>();
+
+    public static String messageFromPeerHandler(byte[] msgBytes) {
+        String message = new String(msgBytes).trim();
+        System.out.println("Received " + msgBytes.length + " bytes.");
+        String[] msg = message.split(":");
+        String protocol = msg[0];
+
+        switch (protocol) {
+            case "BACKUP" -> {
+                System.out.println("This peer got the message: " + msg[0] + " " + msg[1] + " " + msg[2]);
+
+                int tmp = msg[0].length() + msg[1].length() + msg[2].length() + 3;
+
+                long fileSize = Long.parseLong(msg[2]);
+
+                System.out.println("LOOK: " + 0);
+
+                if(fileSize > Utils.MAX_BYTE_MSG) {
+                    System.out.println("LOOK: " + 1);
+                    if(!backupOps.containsKey(msg[1])) backupOps.put(msg[1], (int) Math.ceil((double) fileSize / Utils.MAX_BYTE_MSG));
+                    System.out.println("LOOK: " + 2);
+
+                    byte[] fileBytes = new byte[Utils.MAX_BYTE_MSG];
+                    System.arraycopy(msgBytes, tmp, fileBytes, 0, msgBytes.length - tmp);
+
+                    System.out.println("LOOK: " + 3);
+
+                    if(backupOpFiles.containsKey(msg[1])) backupOpFiles.put(msg[1], fileBytes);
+                    else {
+                        System.out.println("LOOK: " + 4);
+                        System.arraycopy(backupOpFiles.get(msg[1]), 0, fileBytes, fileBytes.length-1, backupOpFiles.get(msg[1]).length);
+                        backupOpFiles.put(msg[1], fileBytes);
+                        backupOps.put(msg[1], backupOps.get(msg[1]) - 1);
+                        if(backupOps.get(msg[1]) == 0) {
+                            System.out.println("LOOK: " + 5);
+                            Backup backupProtocol = new Backup(msg[1], fileBytes, peerID);
+                            backupProtocol.performBackup();
+                            backupOps.remove(msg[1]);
+                            backupOpFiles.remove(msg[1]);
+                        }
+                    }
+                } else {
+                    System.out.println("LOOK: " + 6);
+                    byte[] fileBytes = new byte[(int) fileSize];
+                    System.arraycopy(msgBytes, tmp, fileBytes, 0, (int) fileSize);
+
+                    Backup backupProtocol = new Backup(msg[1], fileBytes, peerID);
+                    backupProtocol.performBackup();
+                }
+                System.out.println("LOOK: " + 7);
+            }
+            default -> System.err.println("> Peer " + peerID + " got the following basic message: " + message);
+        }
+
+        return "Protocol operation finished";
     }
 
 
@@ -116,6 +183,7 @@ public class Peer implements ServiceInterface {
     private void createDirectories() {
         try {
             Files.createDirectories(Paths.get("peer " + peerID + "\\files"));
+            Files.createDirectories(Paths.get("peer " + peerID + "\\backups"));
         } catch (Exception e) {
             System.err.println("> Peer " + peerID + " exception: failed to create peer directory");
         }
@@ -153,11 +221,29 @@ public class Peer implements ServiceInterface {
         String[] args = {String.valueOf(peerID), "BACKUP", file_name, String.valueOf(replicationDegree), String.valueOf(filemanager.getFile().length())};
         String message = formMessage(args);
         String response = peerToMainChannel.sendMessageToMain(message, null);
-        System.out.println("RESPONSE: " + response);
 
-       // peerChannel.sendMessageToPeer( filename, file_content );
+        String[] peers = response.split("=");
 
-        return "null;";
+        ArrayList<String> results = new ArrayList<>();
+
+        for(String peer : peers) {
+            String[] tmp = peer.split(":");
+            String address = tmp[0];
+            String port = tmp[1];
+            try {
+                results.add(peerToPeerChannel.sendMessageToPeer("BACKUP", address, port, file_name, filemanager.getFile().length(), Files.readAllBytes(Path.of(filemanager.getFile().getPath()))));
+            } catch (IOException e) {
+                System.err.println("> Peer " + peerID + " exception: failed to read bytes of file");
+            }
+        }
+
+        int actualRepDegree = 0;
+        for (String r : results) {
+            if(!r.equals("error")) {
+                actualRepDegree++;
+            }
+        }
+        return "BACKUP operation finished with a replication degree of " + actualRepDegree;
     }
 
     @Override

@@ -4,8 +4,6 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.ObjectInput;
 import java.io.ObjectInputStream;
-import java.nio.channels.AsynchronousSocketChannel;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.concurrent.ConcurrentHashMap;
@@ -49,11 +47,11 @@ public class MainPeer {
             return;
         }
 
-        peerChannel = new PeerChannel(0, true, peerAddress, peerPort, null);
+        peerChannel = new PeerChannel(0, true, true, peerAddress, peerPort, null);
         peerChannel.start();
     }
 
-    public static String messageFromPeerHandler(byte[] msgBytes, AsynchronousSocketChannel clientChannel) {
+    public static String messageFromPeerHandler(byte[] msgBytes) {
         String message = new String(msgBytes).trim();
         System.out.println("This peer got the message: " + message);
         String[] msg = message.split(":");
@@ -98,7 +96,7 @@ public class MainPeer {
                 rep_deg = Integer.parseInt(msg[3]);
                 fileSize = Long.parseLong(msg[4]);
 
-                HashMap<Integer,HashMap<String,Long>> peers = new HashMap<>();
+                HashMap<Integer, HashMap<String,Long>> peers = new HashMap<>();
 
                 boolean ignoreFile;
 
@@ -124,7 +122,23 @@ public class MainPeer {
                         }
                 }
 
-                return peers.toString();
+                StringBuilder response = new StringBuilder();
+                
+                for(int peer : peers.keySet()) {
+                    for(String address : peers.get(peer).keySet()){
+                        response.append(address);
+                        response.append(":");
+                        response.append(peers.get(peer).get(address));
+                    }
+                    response.append("=");
+                }
+
+                System.out.println(response);
+                if(!response.isEmpty()) response.deleteCharAt(response.length()-1);
+                else response.append("empty");
+                System.out.println(response);
+                
+                return response.toString();
             }
             case "RESTORE" -> {
                 filename = msg[1];

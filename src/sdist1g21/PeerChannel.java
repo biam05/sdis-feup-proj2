@@ -1,13 +1,17 @@
 package sdist1g21;
 
-import java.io.*;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.ObjectOutputStream;
 import java.net.InetSocketAddress;
 import java.net.StandardSocketOptions;
 import java.nio.ByteBuffer;
 import java.nio.channels.AsynchronousServerSocketChannel;
 import java.nio.channels.AsynchronousSocketChannel;
-import java.util.Locale;
-import java.util.concurrent.*;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
 
 public class PeerChannel extends Thread {
     AsynchronousServerSocketChannel mainChannel;
@@ -15,15 +19,16 @@ public class PeerChannel extends Thread {
     PeerContainer peerContainer;
     String serverAddress;
     int peerID, serverPort;
-    boolean isMainPeer, closeChannel;
+    boolean isMainPeer, isServerPeer, closeChannel;
 
     ScheduledThreadPoolExecutor peerChannelExecutors = new ScheduledThreadPoolExecutor(Utils.MAX_THREADS);
 
-    public PeerChannel(int peerID, Boolean isMain, String serverAddress, int serverPort, PeerContainer peerContainer) {
+    public PeerChannel(int peerID, Boolean isMain, Boolean isServerPeer, String serverAddress, int serverPort, PeerContainer peerContainer) {
         this.serverAddress=serverAddress;
         this.serverPort=serverPort;
         this.peerID = peerID;
-        isMainPeer = isMain;
+        this.isMainPeer = isMain;
+        this.isServerPeer = isServerPeer;
         this.peerContainer = peerContainer;
         closeChannel = false;
     }
@@ -57,7 +62,9 @@ public class PeerChannel extends Thread {
                                 byte[] msgBytes = buffer.array();
                                 buffer.flip();
                                 peerChannelExecutors.execute(() -> {
-                                    Future<Integer> writeResult = clientChannel.write(ByteBuffer.wrap(MainPeer.messageFromPeerHandler(msgBytes, clientChannel).getBytes()));
+                                    Future<Integer> writeResult;
+                                    if(isMainPeer) writeResult = clientChannel.write(ByteBuffer.wrap(MainPeer.messageFromPeerHandler(msgBytes).getBytes()));
+                                    else writeResult = clientChannel.write(ByteBuffer.wrap(Peer.messageFromPeerHandler(msgBytes).getBytes()));
                                     try {
                                         System.out.println("Sent " + writeResult.get() + " bytes.");
                                     } catch (InterruptedException | ExecutionException e) {
@@ -123,9 +130,20 @@ public class PeerChannel extends Thread {
         return sendMessage(message, bytesMsg, serverChannel);
     }
 
-    public String sendMessageToPeer(String message, byte[] bytesMsg) {
-        //return sendMessage(message, bytesMsg, clientChannel);
-        return "";
+    public String sendMessageToPeer(String op, String address, String port, String file_name, long fileSize, byte[] fileBytes) {
+        String message = op + ":" + file_name + ":" + fileSize + ":";
+        AsynchronousSocketChannel channel;
+        try {
+            channel = AsynchronousSocketChannel.open();
+            InetSocketAddress hostAddress = new InetSocketAddress(address, Integer.parseInt(port));
+
+            Future<Void> future = channel.connect(hostAddress);
+            future.get();
+        } catch (IOException | ExecutionException | InterruptedException e) {
+            System.err.println("PeerChannel exception: Failed to send message to peer!");
+            return "error";
+        }
+        return sendMessage(message, fileBytes, channel);
     }
 
     private String sendMessage(String message, byte[] bytesMsg, AsynchronousSocketChannel channel) {
@@ -133,6 +151,7 @@ public class PeerChannel extends Thread {
             System.err.println("PeerChannel exception: Failed to send message because channel connection is inactive");
             return null;
         }
+
         try {
             // SEND MESSAGE
             byte[] msgbytes = message.getBytes();
@@ -160,8 +179,6 @@ public class PeerChannel extends Thread {
             String response = new String(buffer.array()).trim();
             System.out.println("Message received: " + response);
 
-            //this.messageFromPeerHandler();
-
             buffer.clear();
             return response;
         } catch (InterruptedException | ExecutionException e ) {
@@ -170,31 +187,9 @@ public class PeerChannel extends Thread {
         }
     }
 
-
-    public void messageFromPeerHandler(String message) {
-        System.out.println("This peer got the message: " + message);
-        String[] msg = message.split(":");
-        String filename;
-        long max_disk_space;
-        byte[] file_content;
-        switch (msg[0].toUpperCase(Locale.ROOT)) {
-            case "BACKUP" -> {
-                if (msg.length < 3) {
-                    System.err.println("> Peer " + this.peerID + " exception: invalid message received");
-                    return;
-                }
-                filename = msg[1];
-                file_content = msg[2].getBytes();
-                Backup backup = new Backup(filename,file_content);
-                backup.performBackup();
-            }
-            default -> System.err.println("> Peer " + this.peerID + " got the following basic message: " + message);
-        }
-    }
-
     @Override
     public void run() {
-        if(isMainPeer) peerChannelExecutors.execute(this::serverChannel);
+        if(isMainPeer || isServerPeer) peerChannelExecutors.execute(this::serverChannel);
         else peerChannelExecutors.execute(this::clientChannel);
     }
 }

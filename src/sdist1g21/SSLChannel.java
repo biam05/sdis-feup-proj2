@@ -7,6 +7,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
+import java.util.Locale;
 
 public class SSLChannel extends Thread {
 
@@ -48,9 +49,11 @@ public class SSLChannel extends Thread {
         while(true) {
             try {
                 clientSocket = (SSLSocket) socket.accept();
-                BufferedReader br = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
-                message = br.readLine();
-                Peer.messageFromTestAppHandler(message);
+                BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+                PrintWriter out = new PrintWriter(clientSocket.getOutputStream(), true);
+                message = in.readLine();
+                String response = Peer.messageFromTestAppHandler(message);
+                out.println(response);
             } catch(IOException e) {
                 System.err.println("> SSLChannel: Failed to receive message!");
                 e.printStackTrace();
