@@ -2,6 +2,7 @@ package sdist1g21;
 
 import java.io.*;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
@@ -15,7 +16,8 @@ public class PeerContainer implements Serializable {
     private long maxSpace;
     private long freeSpace;
 
-    private static final ScheduledThreadPoolExecutor peerContainerExecutors = new ScheduledThreadPoolExecutor(Utils.MAX_THREADS);
+    private static final ScheduledThreadPoolExecutor peerContainerExecutors = new ScheduledThreadPoolExecutor(
+            Utils.MAX_THREADS);
 
     public PeerContainer(int peerID, String peerAddress, int peerPort) {
         this.peerID = peerID;
@@ -36,7 +38,8 @@ public class PeerContainer implements Serializable {
                 out.writeObject(this);
                 out.close();
                 stateFileOut.close();
-                //System.out.println("> Peer " + peerID + ": Serialized state saved in /peer " + peerID + "/state.ser");
+                // System.out.println("> Peer " + peerID + ": Serialized state saved in /peer "
+                // + peerID + "/state.ser");
             } catch (IOException i) {
                 System.err.println("> Peer " + peerID + ": Failed to save serialized state");
                 i.printStackTrace();
@@ -70,20 +73,23 @@ public class PeerContainer implements Serializable {
     }
 
     /**
-     * Function used to read the physical state of the Peer's Filesystem and update the Peer's container with it
+     * Function used to read the physical state of the Peer's Filesystem and update
+     * the Peer's container with it
      */
     public synchronized void updateState() {
         // Register all files
         try {
             Files.walk(Paths.get("peer " + peerID + "/files")).forEach(filePath -> {
                 if (!filePath.toFile().isDirectory()) {
-                    FileManager fileManager = new FileManager("peer " + peerID + "/files/" + filePath.getFileName().toString(), 0);
-                    if(!storedFiles.contains(fileManager)) {
+                    FileManager fileManager = new FileManager(
+                            "peer " + peerID + "/files/" + filePath.getFileName().toString(), 0);
+                    if (!storedFiles.contains(fileManager)) {
                         storedFiles.add(fileManager);
                         try {
                             freeSpace -= Files.size(filePath);
                         } catch (IOException e) {
-                            System.err.println("> Peer " + peerID + ": Failed to get size of file: " + fileManager.getFile().getName());
+                            System.err.println("> Peer " + peerID + ": Failed to get size of file: "
+                                    + fileManager.getFile().getName());
                         }
                     }
                 }
@@ -116,4 +122,44 @@ public class PeerContainer implements Serializable {
     public long getPeerPort() {
         return peerPort;
     }
+
+    /**
+     * Function used to increment the free space
+     * 
+     * @param size amount of space that will be incremented
+     */
+    public synchronized void incFreeSpace(long size) {
+        this.freeSpace += size;
+        saveState();
+    }
+
+    /**
+     * Function used to add a FileManager to the Stored FileManager array
+     * 
+     * @param file FileManager that is gonna be stored
+     */
+    public synchronized void addStoredFile(FileManager file) {
+        for (FileManager storedFile : this.storedFiles) {
+            if (file.equals(storedFile))
+                return; // cant store equal files
+        }
+        this.storedFiles.add(file);
+        saveState();
+    }
+
+    /**
+     * Function used to delete a File from the Stored Files Array
+     * 
+     * @param file file that is gonna eb deleted
+     */
+    public synchronized void deleteStoredFile(FileManager file) {
+        try {
+            Files.deleteIfExists(Path.of("peer " + peerID + "\\" + "files\\" + file.getFile().getName()));
+            System.out.println("> Peer " + peerID + ": DELETE of file " + file.getFile().getName() + " finished");
+        } catch (IOException e) {
+            System.err.println("> Peer " + peerID + ": Failed to delete file " + file.getFile().getName());
+            e.printStackTrace();
+        }
+    }
+
 }

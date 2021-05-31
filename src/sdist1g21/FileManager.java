@@ -16,16 +16,17 @@ public class FileManager implements Serializable {
     private final String fileID;
     private final File file;
 
-    private final int replicationDegree;
+    private int replicationDegree;
 
     private boolean alreadyBackedUp;
 
     /**
      * FileManager Constructor
-     * @param path Path of the File
+     * 
+     * @param path              Path of the File
      * @param replicationDegree Replication Degree of the File
      */
-    public FileManager(String path, int replicationDegree){
+    public FileManager(String path, int replicationDegree) {
         this.file = new File(path);
         this.replicationDegree = replicationDegree;
         this.fileID = id();
@@ -34,30 +35,38 @@ public class FileManager implements Serializable {
 
     /**
      * Replication Degree Getter
+     * 
      * @return Replication Degree
      */
     public int getReplicationDegree() {
         return replicationDegree;
     }
 
+    public void setReplicationDegree(int r) {
+        this.replicationDegree = r;
+    }
+
     /**
      * File ID Getter
+     * 
      * @return File ID
      */
-    public String getFileID(){
+    public String getFileID() {
         return fileID;
     }
 
     /**
      * File Getter
+     * 
      * @return File
      */
-    public File getFile(){
+    public File getFile() {
         return file;
     }
 
     /**
      * Check if a file was already backed up
+     * 
      * @return True if the file was already backed up. False otherwise
      */
     public boolean isAlreadyBackedUp() {
@@ -66,6 +75,7 @@ public class FileManager implements Serializable {
 
     /**
      * Change if the file was already backed up
+     * 
      * @param alreadyBackedUp new value
      */
     public void setAlreadyBackedUp(boolean alreadyBackedUp) {
@@ -74,14 +84,15 @@ public class FileManager implements Serializable {
 
     /**
      * Function used to get the File ID
+     * 
      * @return File ID (after SHA256 encoding)
      *
-     * Reutilized from Project 1
+     *         Reutilized from Project 1
      */
-    private synchronized String id(){
-        String filename = this.file.getName();                      // file name
+    private synchronized String id() {
+        String filename = this.file.getName(); // file name
         String filedate = String.valueOf(this.file.lastModified()); // date modified
-        String fileowner = this.file.getParent();                   // owner
+        String fileowner = this.file.getParent(); // owner
 
         String originalString = filename + ":" + filedate + ":" + fileowner;
         return sha256(originalString); // sha-256 encryption
@@ -89,25 +100,27 @@ public class FileManager implements Serializable {
 
     /**
      * SHA256 Encoding Function
+     * 
      * @param originalString Orignal String before encoding
      * @return String after Encoding
      *
-     * Reutilized from Project 1
+     *         Reutilized from Project 1
      */
-    private synchronized static String sha256(String originalString){
-        try{
+    private synchronized static String sha256(String originalString) {
+        try {
             MessageDigest md = MessageDigest.getInstance("SHA-256");
             byte[] hash = md.digest(originalString.getBytes(StandardCharsets.UTF_8));
             StringBuilder hexString = new StringBuilder();
             // convert a byte array to a string of hex digits
             for (byte b : hash) {
                 String hex = Integer.toHexString(0xff & b);
-                if (hex.length() == 1) hexString.append('0'); // 1 digit hexadecimal
+                if (hex.length() == 1)
+                    hexString.append('0'); // 1 digit hexadecimal
                 hexString.append(hex);
             }
             return hexString.toString();
 
-        }catch(Exception e){
+        } catch (Exception e) {
             System.err.println("Error in SHA-256 Encryptation.\n");
             throw new RuntimeException(e);
         }
@@ -115,14 +128,16 @@ public class FileManager implements Serializable {
 
     /**
      * Function Used to Create a File
+     * 
      * @param path Path of the File that is gonna be Created
-     * @param pID ID of the Peer that is creating the File
+     * @param pID  ID of the Peer that is creating the File
      */
     public synchronized void createFile(Path path, int pID) throws IOException {
         try {
             byte[] content = Files.readAllBytes(path);
 
-            AsynchronousFileChannel fileChannel = AsynchronousFileChannel.open(path, StandardOpenOption.CREATE, StandardOpenOption.WRITE);
+            AsynchronousFileChannel fileChannel = AsynchronousFileChannel.open(path, StandardOpenOption.CREATE,
+                    StandardOpenOption.WRITE);
             fileChannel.write(ByteBuffer.wrap(content), 0);
             fileChannel.close();
             System.out.println("> Peer " + pID + ": File at " + path + " was created successfully");
