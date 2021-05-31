@@ -117,7 +117,9 @@ public class Peer implements ServiceInterface {
                     System.err.println("> Peer " + peerID + " exception: invalid message received");
                 }
             }
-            case "STATE" -> peer.state();
+            case "STATE" -> {
+                return peer.state();
+            }
             default -> System.err.println("> Peer " + peerID + " got the following basic message: " + message);
         }
         return "error";
@@ -268,7 +270,20 @@ public class Peer implements ServiceInterface {
 
     @Override
     public String delete(String file_name) {
-        return null;
+        FileManager filemanager = null;
+        for (FileManager file : peerContainer.getStoredFiles())
+            if (file.getFile().getName().equals(file_name))
+                filemanager = file;
+        if (filemanager == null)
+            return "Unsuccessful DELETE of file " + file_name + ", this file does not exist on this peer's file system";
+
+        String[] args = { String.valueOf(peerID), "DELETE", file_name };
+        String message = formMessage(args);
+        String response = peerToMainChannel.sendMessageToMain(message, null);
+
+        System.out.println("RESPOSTA:" + response);
+
+        return "DELETE operation finished";
     }
 
     @Override
@@ -278,6 +293,63 @@ public class Peer implements ServiceInterface {
 
     @Override
     public String state() {
-        return null;
+        int nFile = 1;
+        StringBuilder state = new StringBuilder();
+        state.append(":::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::\n");
+        state.append(":::                                   PEER ").append(peerID).append("                                  :::\n");
+        state.append(":::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::\n");
+        state.append(":::                            OWN BACKED UP FILES                            :::\n");
+        // each file whose backup has initiated
+        for(FileManager fileManager : peerContainer.getStoredFiles()){
+            if(fileManager.isAlreadyBackedUp()) {
+                state.append(":::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::\n");
+                state.append("::: FILE ").append(nFile).append("                                                                    :::\n");
+                state.append(":::                                                                           :::\n");
+                state.append("::: PATH: ").append(fileManager.getFile().getPath()).append("                                             :::\n");
+                state.append("::: FILE_ID: ").append(fileManager.getFileID()).append(" :::\n");
+                state.append("::: DESIRED REPLICATION DEGREE: ").append(fileManager.getReplicationDegree()).append("                                             :::\n");
+                state.append(":::                                                                           :::\n");
+                nFile++;
+            }
+        }
+        if(nFile == 1){
+            state.append(":::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::\n");
+            state.append("::: NONE OF MY FILES HAVE BEEN BACKED UP YET                                  :::\n");
+        }
+        nFile = 1;
+
+        // backed up files from other peers
+        state.append(":::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::\n");
+        state.append(":::                           OTHER BACKED UP FILES                           :::\n");
+        for(FileManager fileManager : peerContainer.getBackedUpFiles()){
+            state.append(":::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::\n");
+            state.append("::: FILE ").append(nFile).append("                                                                    :::\n");
+            state.append(":::                                                                           :::\n");
+            state.append("::: PATH: ").append(fileManager.getFile().getPath()).append("                                             :::\n");
+            state.append("::: FILE_ID: ").append(fileManager.getFileID()).append(" :::\n");
+            state.append("::: DESIRED REPLICATION DEGREE: ").append(fileManager.getReplicationDegree()).append("                                             :::\n");
+            state.append("::: CURRENT REPLICATION DEGREE: ").append(fileManager.getReplicationDegree()).append("                                             :::\n");
+            state.append(":::                                                                           :::\n");
+            nFile++;
+        }
+        if(nFile == 1){
+            state.append(":::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::\n");
+            state.append("::: I DON'T HAVE BACKED UP FILES FROM OTHER PEERS YET                         :::\n");
+        }
+
+        // peer storage capacity
+        state.append(":::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::\n");
+        state.append(":::                           PEER STORAGE CAPACITY                           :::\n");
+        state.append(":::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::\n");
+        state.append("::: TOTAL DISK SPACE: ").append(peerContainer.getMaxSpace() / 1000).append(" KB                                                 :::\n");
+        state.append("::: FREE SPACE: ").append(peerContainer.getFreeSpace() / 1000).append(" KB                                                       :::\n");
+        state.append(":::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::");
+
+        System.out.println(state);
+        return state.toString();
     }
+
+
+
 }
+

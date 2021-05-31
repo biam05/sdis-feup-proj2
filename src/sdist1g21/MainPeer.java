@@ -88,7 +88,7 @@ public class MainPeer {
             }
             case "BACKUP" -> {
                 if (msg.length < 5) {
-                    System.err.println("> Main peer exception: invalid message received");
+                    System.err.println("> Main peer exception: invalid message received (BACKUP)");
                     return "error";
                 }
                 initiatorPeerID = Integer.parseInt(msg[0]);
@@ -143,21 +143,57 @@ public class MainPeer {
             case "RESTORE" -> {
                 filename = msg[1];
                 if (msg.length < 2) {
-                    System.err.println("> Main peer exception: invalid message received");
+                    System.err.println("> Main peer exception: invalid message received (RESTORE)");
                 }
                 return "something";
             }
             case "DELETE" -> {
-                filename = msg[1];
                 if (msg.length < 2) {
-                    System.err.println("> Main peer exception: invalid message received");
+                    System.err.println("> Main peer exception: invalid message received (DELETE)");
                 }
-                return "something";
+                initiatorPeerID = Integer.parseInt(msg[0]);
+                filename = msg[1];
+
+                HashMap<Integer, HashMap<String,Long>> peers = new HashMap<>();
+
+                boolean ignoreFile;
+
+                for(int peerID : peerContainers.keySet()) {
+                    if (peerID == initiatorPeerID) continue;
+                    ignoreFile = false;
+                    PeerContainer tmp = peerContainers.get(peerID);
+                    for (FileManager fileManager : tmp.getStoredFiles()) {
+                        if (!fileManager.getFile().getName().equals(filename)) {
+                            ignoreFile = true;
+                            break;
+                        }
+                    }
+                    if (ignoreFile) continue;
+                }
+
+                StringBuilder response = new StringBuilder();
+
+                for(int peer : peers.keySet()) {
+                    for(String address : peers.get(peer).keySet()){
+                        response.append(address);
+                        response.append(":");
+                        response.append(peers.get(peer).get(address));
+                    }
+                    response.append("=");
+                }
+
+                System.out.println(response);
+                if(!response.isEmpty()) response.deleteCharAt(response.length()-1);
+                else response.append("empty");
+                System.out.println(response);
+
+                return response.toString();
             }
+
             case "RECLAIM" -> {
                 max_disk_space = Long.parseLong(msg[1]);
                 if (msg.length < 2) {
-                    System.err.println("> Main peer exception: invalid message received");
+                    System.err.println("> Main peer exception: invalid message received (RECLAIM)");
                 }
                 return "something";
             }

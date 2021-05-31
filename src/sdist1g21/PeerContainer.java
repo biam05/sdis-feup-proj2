@@ -12,6 +12,7 @@ public class PeerContainer implements Serializable {
     private String peerAddress;
     private int peerPort;
     private ArrayList<FileManager> storedFiles;
+    private ArrayList<FileManager> backedUpFiles;
 
     private long maxSpace;
     private long freeSpace;
@@ -24,6 +25,7 @@ public class PeerContainer implements Serializable {
         this.peerAddress = peerAddress;
         this.peerPort = peerPort;
         storedFiles = new ArrayList<>();
+        backedUpFiles = new ArrayList<>();
         this.maxSpace = this.freeSpace = Utils.MAX_STORAGE_SPACE;
     }
 
@@ -107,6 +109,10 @@ public class PeerContainer implements Serializable {
         return storedFiles;
     }
 
+    public ArrayList<FileManager> getBackedUpFiles() {
+        return backedUpFiles;
+    }
+
     public long getMaxSpace() {
         return maxSpace;
     }
@@ -147,14 +153,23 @@ public class PeerContainer implements Serializable {
         saveState();
     }
 
+    public synchronized void addBackedUpFiles(FileManager file) {
+        for (FileManager backedUpFile : this.backedUpFiles) {
+            if (file.equals(backedUpFile))
+                return; // cant store equal files
+        }
+        this.backedUpFiles.add(file);
+        saveState();
+    }
+
     /**
      * Function used to delete a File from the Stored Files Array
      * 
-     * @param file file that is gonna eb deleted
+     * @param file file that is gonna be deleted
      */
     public synchronized void deleteStoredFile(FileManager file) {
         try {
-            Files.deleteIfExists(Path.of("peer " + peerID + "\\" + "files\\" + file.getFile().getName()));
+            Files.deleteIfExists(Path.of("peer " + peerID + "\\" + "backups\\" + file.getFile().getName()));
             System.out.println("> Peer " + peerID + ": DELETE of file " + file.getFile().getName() + " finished");
         } catch (IOException e) {
             System.err.println("> Peer " + peerID + ": Failed to delete file " + file.getFile().getName());
