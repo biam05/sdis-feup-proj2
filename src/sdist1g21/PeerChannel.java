@@ -8,6 +8,7 @@ import java.net.StandardSocketOptions;
 import java.nio.ByteBuffer;
 import java.nio.channels.AsynchronousServerSocketChannel;
 import java.nio.channels.AsynchronousSocketChannel;
+import java.util.Arrays;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -119,7 +120,7 @@ public class PeerChannel extends Thread {
             byte[] peerContainerBytes = bos.toByteArray();
 
             bos.close();
-            sendMessageToMain(peerID + ":WELCOME:", peerContainerBytes);
+            sendMessageToMain(peerID + ":PEERCONTAINER:", peerContainerBytes);
         } catch (IOException e) {
             System.err.println("PeerChannel exception: Failed to encode peerContainer!");
             e.printStackTrace();
@@ -131,7 +132,15 @@ public class PeerChannel extends Thread {
     }
 
     public String sendMessageToPeer(String op, String address, String port, String file_name, long fileSize, byte[] fileBytes) {
-        String message = op + ":" + file_name + ":" + fileSize + ":";
+        String message = "INVALID";
+        switch (op) {
+            case "BACKUP" -> {
+                message = op + ":" + file_name + ":" + fileSize + ":";
+            }
+            case "DELETE" -> {
+                message = op + ":" + file_name + ":";
+            }
+        }
         AsynchronousSocketChannel channel;
         try {
             channel = AsynchronousSocketChannel.open();
@@ -146,7 +155,7 @@ public class PeerChannel extends Thread {
         return sendMessage(message, fileBytes, channel);
     }
 
-    private String sendMessage(String message, byte[] bytesMsg, AsynchronousSocketChannel channel) {
+    private String sendMessage(String message, byte[] fileBytes, AsynchronousSocketChannel channel) {
         if(!channel.isOpen()) {
             System.err.println("PeerChannel exception: Failed to send message because channel connection is inactive");
             return null;
@@ -159,7 +168,22 @@ public class PeerChannel extends Thread {
             ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
             try {
                 outputStream.write(msgbytes);
-                if(bytesMsg != null) outputStream.write(bytesMsg);
+                if(fileBytes != null) {
+                    if(msgbytes.length + fileBytes.length > Utils.MAX_BYTE_MSG) {
+                        int size = fileBytes.length;
+                        int maxContentSize = Utils.MAX_BYTE_MSG - (msgbytes.length + 5);
+                        int count = 0;
+                        while(size > maxContentSize) {
+                            if(count != 0)
+                                outputStream.write(msgbytes);
+                            writeWithCount(fileBytes, outputStream, maxContentSize, maxContentSize, count);
+                            size -= maxContentSize;
+                            count++;
+                        }
+                        outputStream.write(msgbytes);
+                        writeWithCount(fileBytes, outputStream, size, maxContentSize, count);
+                    } else writeWithCount(fileBytes, outputStream, fileBytes.length, Utils.MAX_BYTE_MSG, 0);
+                }
             } catch (IOException e) {
                 e.printStackTrace();
                 System.err.println("PeerChannel exception: Failed to mount message bytes");
@@ -179,12 +203,28 @@ public class PeerChannel extends Thread {
             String response = new String(buffer.array()).trim();
             System.out.println("Message received: " + response);
 
+            while(response.equals("Awaiting further messages with file information")) {
+                buffer = ByteBuffer.allocate(Utils.MAX_BYTE_MSG);
+                readResult = channel.read(buffer);
+                System.out.println("Received " + readResult.get() + " bytes");
+                response = new String(buffer.array()).trim();
+                System.out.println("Message received: " + response);
+            }
+
             buffer.clear();
             return response;
         } catch (InterruptedException | ExecutionException e ) {
             System.err.println("PeerChannel exception: Failed to send message to server");
             return null;
         }
+    }
+
+    private void writeWithCount(byte[] fileBytes, ByteArrayOutputStream outputStream, int size, int maxContentSize, int count) throws IOException {
+        if(count < 10) outputStream.write(("000" + count + ":").getBytes());
+        else if(count < 100) outputStream.write(("00" + count + ":").getBytes());
+        else if(count < 1000) outputStream.write(("0" + count + ":").getBytes());
+        else outputStream.write((count + ":").getBytes());
+        outputStream.write(fileBytes, count * maxContentSize, size);
     }
 
     @Override

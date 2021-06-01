@@ -9,9 +9,10 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 
 public class PeerContainer implements Serializable {
     private int peerID;
-    private String peerAddress;
-    private int peerPort;
+    private final String peerAddress;
+    private final int peerPort;
     private ArrayList<FileManager> storedFiles;
+    private ArrayList<FileManager> backedUpFiles;
 
     private long maxSpace;
     private long freeSpace;
@@ -24,7 +25,9 @@ public class PeerContainer implements Serializable {
         this.peerAddress = peerAddress;
         this.peerPort = peerPort;
         storedFiles = new ArrayList<>();
-        this.maxSpace = this.freeSpace = Utils.MAX_STORAGE_SPACE;
+        backedUpFiles = new ArrayList<>();
+        this.maxSpace = Utils.MAX_STORAGE_SPACE;
+        this.freeSpace = Utils.MAX_STORAGE_SPACE;
     }
 
     /**
@@ -38,8 +41,6 @@ public class PeerContainer implements Serializable {
                 out.writeObject(this);
                 out.close();
                 stateFileOut.close();
-                // System.out.println("> Peer " + peerID + ": Serialized state saved in /peer "
-                // + peerID + "/state.ser");
             } catch (IOException i) {
                 System.err.println("> Peer " + peerID + ": Failed to save serialized state");
                 i.printStackTrace();
@@ -68,6 +69,7 @@ public class PeerContainer implements Serializable {
 
         peerID = peerContainer.getPeerID();
         storedFiles = peerContainer.getStoredFiles();
+        backedUpFiles = peerContainer.getBackedUpFiles();
         maxSpace = peerContainer.getMaxSpace();
         freeSpace = peerContainer.getFreeSpace();
     }
@@ -94,6 +96,21 @@ public class PeerContainer implements Serializable {
                     }
                 }
             });
+            Files.walk(Paths.get("peer " + peerID + "/backups")).forEach(filePath -> {
+                if (!filePath.toFile().isDirectory()) {
+                    FileManager fileManager = new FileManager(
+                            "peer " + peerID + "/backups/" + filePath.getFileName().toString(), 0);
+                    if (!backedUpFiles.contains(fileManager)) {
+                        backedUpFiles.add(fileManager);
+                        try {
+                            freeSpace -= Files.size(filePath);
+                        } catch (IOException e) {
+                            System.err.println("> Peer " + peerID + ": Failed to get size of file: "
+                                    + fileManager.getFile().getName());
+                        }
+                    }
+                }
+            });
         } catch (IOException e) {
             System.err.println("> Peer " + peerID + ": Failed to iterate files of peer");
         }
@@ -105,6 +122,10 @@ public class PeerContainer implements Serializable {
 
     public ArrayList<FileManager> getStoredFiles() {
         return storedFiles;
+    }
+
+    public ArrayList<FileManager> getBackedUpFiles() {
+        return backedUpFiles;
     }
 
     public long getMaxSpace() {
@@ -124,11 +145,11 @@ public class PeerContainer implements Serializable {
     }
 
     /**
-     * Function used to increment the free space
+     * Function used to change the free space
      * 
-     * @param size amount of space that will be incremented
+     * @param size amount of space that will be added
      */
-    public synchronized void incFreeSpace(long size) {
+    public synchronized void addFreeSpace(long size) {
         this.freeSpace += size;
         saveState();
     }
@@ -148,13 +169,27 @@ public class PeerContainer implements Serializable {
     }
 
     /**
-     * Function used to delete a File from the Stored Files Array
-     * 
-     * @param file file that is gonna eb deleted
+     * Function used to add a FileManager to the BackedUp FileManager array
+     *
+     * @param file FileManager that is gonna be stored
      */
-    public synchronized void deleteStoredFile(FileManager file) {
+    public synchronized void addBackedUpFile(FileManager file) {
+        for (FileManager backedUpFile : this.backedUpFiles) {
+            if (file.equals(backedUpFile))
+                return; // cant store equal files
+        }
+        this.backedUpFiles.add(file);
+        saveState();
+    }
+
+    /**
+     * Function used to delete a File from the Stored BackedUp Files Array
+     * 
+     * @param file file that is gonna be deleted
+     */
+    public synchronized void deleteStoredBackupFile(FileManager file) {
         try {
-            Files.deleteIfExists(Path.of("peer " + peerID + "\\" + "files\\" + file.getFile().getName()));
+            Files.deleteIfExists(Path.of("peer " + peerID + "\\" + "backups\\" + file.getFile().getName()));
             System.out.println("> Peer " + peerID + ": DELETE of file " + file.getFile().getName() + " finished");
         } catch (IOException e) {
             System.err.println("> Peer " + peerID + ": Failed to delete file " + file.getFile().getName());

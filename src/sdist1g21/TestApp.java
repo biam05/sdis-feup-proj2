@@ -92,7 +92,7 @@ public class TestApp {
                     System.err.println("Wrong number of arguments given for RESTORE operation");
                     return;
                 }
-                String file_name = args[2];
+                String file_name = args[3];
                 out.println(request.toUpperCase(Locale.ROOT) + ":" + file_name);
             }
             // Delete a File
@@ -102,7 +102,7 @@ public class TestApp {
                     System.err.println("Wrong number of arguments given for DELETE operation");
                     return;
                 }
-                String file_name = args[2];
+                String file_name = args[3];
                 out.println(request.toUpperCase(Locale.ROOT) + ":" + file_name);
             }
             // Reclaim Space
@@ -134,7 +134,9 @@ public class TestApp {
             e.printStackTrace();
         }
 
-        System.out.println("SSLClient: " + args[2] + " " + args[3] + " : " + response);
+        response = response.replace("[n]", "\n");
+
+        System.out.println("SSLClient: " + request.toUpperCase(Locale.ROOT) + " protocol got response: \n" + response);
 
         clientSocket.close();
     }

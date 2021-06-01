@@ -43,7 +43,7 @@ public class Reclaim {
         for (FileManager file : peerContainer.getStoredFiles()) {
             if (file.getFileID().equals(fileId)) {
                 ownedFile = true;
-                file.setReplicationDegree(file.getReplicationDegree() - 1);
+                file.setActualReplicationDegree(file.getActualReplicationDegree() - 1);
 
             }
         }

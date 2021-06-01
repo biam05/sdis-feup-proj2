@@ -16,7 +16,8 @@ public class FileManager implements Serializable {
     private final String fileID;
     private final File file;
 
-    private int replicationDegree;
+    private int desiredReplicationDegree;
+    private int actualReplicationDegree;
 
     private boolean alreadyBackedUp;
 
@@ -24,26 +25,39 @@ public class FileManager implements Serializable {
      * FileManager Constructor
      * 
      * @param path              Path of the File
-     * @param replicationDegree Replication Degree of the File
+     * @param desiredReplicationDegree Desired Replication Degree of the File
      */
-    public FileManager(String path, int replicationDegree) {
+    public FileManager(String path, int desiredReplicationDegree) {
         this.file = new File(path);
-        this.replicationDegree = replicationDegree;
+        this.desiredReplicationDegree = desiredReplicationDegree;
         this.fileID = id();
         this.alreadyBackedUp = false;
     }
 
     /**
-     * Replication Degree Getter
+     * Desired Replication Degree Getter
      * 
-     * @return Replication Degree
+     * @return Desired Replication Degree
      */
-    public int getReplicationDegree() {
-        return replicationDegree;
+    public int getDesiredReplicationDegree() {
+        return desiredReplicationDegree;
     }
 
-    public void setReplicationDegree(int r) {
-        this.replicationDegree = r;
+    public void setDesiredReplicationDegree(int r) {
+        this.desiredReplicationDegree = r;
+    }
+
+    /**
+     * Actual Replication Degree Getter
+     *
+     * @return Actual Replication Degree
+     */
+    public int getActualReplicationDegree() {
+        return actualReplicationDegree;
+    }
+
+    public void setActualReplicationDegree(int r) {
+        this.actualReplicationDegree = r;
     }
 
     /**
