@@ -9,10 +9,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.AsynchronousServerSocketChannel;
 import java.nio.channels.AsynchronousSocketChannel;
 import java.util.Arrays;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Future;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.*;
 
 public class PeerChannel extends Thread {
     AsynchronousServerSocketChannel mainChannel;
@@ -131,15 +128,28 @@ public class PeerChannel extends Thread {
         return sendMessage(message, bytesMsg, serverChannel);
     }
 
+    public String sendRestoreMessageToPeer(String op, String address, String port, String file_name, String myAddress, long myPort) {
+        String message = op + ":" + file_name + ":" + myAddress + ":" + myPort + ":";
+        AsynchronousSocketChannel channel;
+        try {
+            channel = AsynchronousSocketChannel.open();
+            InetSocketAddress hostAddress = new InetSocketAddress(address, Integer.parseInt(port));
+
+            Future<Void> future = channel.connect(hostAddress);
+            future.get();
+        } catch (IOException | ExecutionException | InterruptedException e) {
+            System.err.println("PeerChannel exception: Failed to send message to peer!");
+            return "error";
+        }
+        return sendMessage(message, null, channel);
+    }
+
     public String sendMessageToPeer(String op, String address, String port, String file_name, long fileSize, byte[] fileBytes) {
         String message = "INVALID";
         switch (op) {
-            case "BACKUP" -> {
-                message = op + ":" + file_name + ":" + fileSize + ":";
-            }
-            case "DELETE" -> {
-                message = op + ":" + file_name + ":";
-            }
+            case "GETRESTORE", "BACKUP" -> message = op + ":" + file_name + ":" + fileSize + ":";
+            case "DELETE" -> message = op + ":" + file_name + ":";
+            case "REQUESTRESTORE" -> message = op + ":" + file_name + ":" + file_name + ":" + fileSize + ":";
         }
         AsynchronousSocketChannel channel;
         try {

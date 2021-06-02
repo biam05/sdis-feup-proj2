@@ -87,12 +87,12 @@ public class PeerContainer implements Serializable {
                             "peer " + peerID + "/files/" + filePath.getFileName().toString(), 0);
                     if (!storedFiles.contains(fileManager)) {
                         storedFiles.add(fileManager);
-                        try {
+                        /*try {
                             freeSpace -= Files.size(filePath);
                         } catch (IOException e) {
                             System.err.println("> Peer " + peerID + ": Failed to get size of file: "
                                     + fileManager.getFile().getName());
-                        }
+                        }*/
                     }
                 }
             });
@@ -116,6 +116,14 @@ public class PeerContainer implements Serializable {
         }
     }
 
+    public void setMaxSpace(long maxSpace) {
+        this.maxSpace = maxSpace;
+    }
+
+    public void setFreeSpace(long freeSpace) {
+        this.freeSpace = freeSpace;
+    }
+
     public int getPeerID() {
         return peerID;
     }
@@ -136,7 +144,7 @@ public class PeerContainer implements Serializable {
         return freeSpace;
     }
 
-    public String getPeerAdress() {
+    public String getPeerAddress() {
         return peerAddress;
     }
 

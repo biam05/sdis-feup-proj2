@@ -112,8 +112,8 @@ public class TestApp {
                     System.err.println("Wrong number of arguments given for RECLAIM operation");
                     return;
                 }
-                int space = Integer.parseInt(args[2]);
-                out.println(request.toUpperCase(Locale.ROOT) + ":" + space);
+                int max_space = Integer.parseInt(args[3]);
+                out.println(request.toUpperCase(Locale.ROOT) + ":" + max_space);
             }
             // Get Internal State
             case "STATE" -> {

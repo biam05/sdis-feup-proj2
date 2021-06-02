@@ -7,17 +7,12 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
-import java.util.Locale;
 
 public class SSLChannel extends Thread {
 
-    private int port;
     private SSLServerSocket socket;
-    private SSLSocket clientSocket;
-    private String message;
 
     public SSLChannel(int port) {
-        this.port = port;
 
         //set the type of trust store
         System.setProperty("javax.net.ssl.trustStoreType","JKS");
@@ -34,24 +29,24 @@ public class SSLChannel extends Thread {
         SSLServerSocketFactory serverSocketFactory;
         serverSocketFactory=(SSLServerSocketFactory) SSLServerSocketFactory.getDefault();
         try {
-            socket = (SSLServerSocket) serverSocketFactory.createServerSocket(this.port);
+            socket = (SSLServerSocket) serverSocketFactory.createServerSocket(port);
         } catch (IOException e) {
-            System.out.println("> Failed to Start SSLChannel : Port " + this.port);
+            System.out.println("> Failed to Start SSLChannel : Port " + port);
             e.printStackTrace();
             return;
         }
 
-        System.out.println("> Started SSLChannel : Port " + this.port);
+        System.out.println("> Started SSLChannel : Port " + port);
     }
 
     @Override
     public void run() {
         while(true) {
             try {
-                clientSocket = (SSLSocket) socket.accept();
+                SSLSocket clientSocket = (SSLSocket) socket.accept();
                 BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
                 PrintWriter out = new PrintWriter(clientSocket.getOutputStream(), true);
-                message = in.readLine();
+                String message = in.readLine();
                 String response = Peer.messageFromTestAppHandler(message);
                 out.println(response);
             } catch(IOException e) {

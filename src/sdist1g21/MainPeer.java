@@ -117,7 +117,7 @@ public class MainPeer {
                     if(tmp.getFreeSpace() >= fileSize)
                         if(rep_deg > 0) {
                             HashMap<String, Long> tmp2 = new HashMap<>();
-                            tmp2.put(tmp.getPeerAdress(), tmp.getPeerPort());
+                            tmp2.put(tmp.getPeerAddress(), tmp.getPeerPort());
                             peers.put(peerID,tmp2);
                             rep_deg--;
                             if(rep_deg == 0) break;
@@ -126,51 +126,71 @@ public class MainPeer {
 
                 return formPeersList(peers);
             }
-            case "RESTORE" -> {
-                initiatorPeerID = Integer.parseInt(msg[0]);
-                filename = msg[1];
-                if (msg.length < 2) {
-                    System.err.println("> Main peer exception: invalid message received");
-                }
-                return "something";
-            }
-            case "DELETE" -> {
+            case "RESTORE", "DELETE" -> {
                 if (msg.length < 3) {
                     System.err.println("> Main peer exception: invalid message received");
                 }
                 initiatorPeerID = Integer.parseInt(msg[0]);
                 filename = msg[2];
 
-                HashMap<Integer, HashMap<String,Long>> peers = new HashMap<>();
+                return formPeersList(getAllPeersWithBackedUpFile(filename, initiatorPeerID));
+            }
+            case "RECLAIM" -> {
+                if (msg.length < 3) {
+                    System.err.println("> Main peer exception: invalid message received");
+                }
+                initiatorPeerID = Integer.parseInt(msg[0]);
+                filename = msg[2];
+                String response = "";
 
                 for(int peerID : peerContainers.keySet()) {
                     if(peerID == initiatorPeerID) continue;
                     PeerContainer tmp = peerContainers.get(peerID);
+                    boolean hasFile = false;
                     for(FileManager fileManager : tmp.getBackedUpFiles()) {
                         if(fileManager.getFile().getName().equals(filename)) {
-                            HashMap<String, Long> tmp2 = new HashMap<>();
-                            tmp2.put(tmp.getPeerAdress(), tmp.getPeerPort());
-                            peers.put(peerID, tmp2);
+                            hasFile = true;
                             break;
                         }
                     }
+                    for(FileManager fileManager : tmp.getStoredFiles()) {
+                        if(fileManager.getFile().getName().equals(filename)) {
+                            hasFile = true;
+                            break;
+                        }
+                    }
+                    if(!hasFile) {
+                        response = tmp.getPeerAddress() + ":" + tmp.getPeerPort();
+                        break;
+                    }
                 }
 
-                return formPeersList(peers);
-            }
-            case "RECLAIM" -> {
-                initiatorPeerID = Integer.parseInt(msg[0]);
-                max_disk_space = Long.parseLong(msg[1]);
-                if (msg.length < 2) {
-                    System.err.println("> Main peer exception: invalid message received");
-                }
-                return "something";
+                return response;
             }
             default -> {
                 System.out.println("> Main peer got the following basic message: " + message);
                 return "nothing";
             }
         }
+    }
+
+    private static HashMap<Integer, HashMap<String, Long>> getAllPeersWithBackedUpFile(String filename, int initiatorPeerID) {
+        HashMap<Integer, HashMap<String,Long>> peers = new HashMap<>();
+
+        for(int peerID : peerContainers.keySet()) {
+            if(peerID == initiatorPeerID) continue;
+            PeerContainer tmp = peerContainers.get(peerID);
+            for(FileManager fileManager : tmp.getBackedUpFiles()) {
+                if(fileManager.getFile().getName().equals(filename)) {
+                    HashMap<String, Long> tmp2 = new HashMap<>();
+                    tmp2.put(tmp.getPeerAddress(), tmp.getPeerPort());
+                    peers.put(peerID, tmp2);
+                    break;
+                }
+            }
+        }
+
+        return peers;
     }
 
     private static String formPeersList(HashMap<Integer, HashMap<String, Long>> peers) {

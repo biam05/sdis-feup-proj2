@@ -33,7 +33,7 @@ public class Peer implements ServiceInterface {
     private static PeerContainer peerContainer;
 
     private static PeerChannel peerToMainChannel;
-    private PeerChannel peerToPeerChannel;
+    private static PeerChannel peerToPeerChannel;
 
     private String mainPeerAddress, peerAddress;
     private int mainPeerPort, peerPort;
@@ -100,11 +100,11 @@ public class Peer implements ServiceInterface {
                 return peer.backup(filename, rep_deg);
             }
             case "RESTORE" -> {
-                filename = msg[1];
-                peer.restore(filename);
                 if (msg.length < 2) {
                     System.err.println("> Peer " + peerID + " exception: invalid message received");
                 }
+                filename = msg[1];
+                return peer.restore(filename);
             }
             case "DELETE" -> {
                 if (msg.length < 2) {
@@ -114,11 +114,11 @@ public class Peer implements ServiceInterface {
                 return peer.delete(filename);
             }
             case "RECLAIM" -> {
-                max_disk_space = Long.parseLong(msg[1]);
-                peer.reclaim(max_disk_space);
                 if (msg.length < 2) {
                     System.err.println("> Peer " + peerID + " exception: invalid message received");
                 }
+                max_disk_space = Long.parseLong(msg[1]);
+                return peer.reclaim(max_disk_space);
             }
             case "STATE" -> {
                 return peer.state();
@@ -130,6 +130,7 @@ public class Peer implements ServiceInterface {
     }
 
     static ConcurrentHashMap<String, ConcurrentHashMap<Integer, byte[]>> backupOpFiles = new ConcurrentHashMap<>();
+    static ConcurrentHashMap<String, ConcurrentHashMap<Integer, byte[]>> restoreOpFiles = new ConcurrentHashMap<>();
 
     public static String messageFromPeerHandler(byte[] msgBytes) {
         String message = new String(msgBytes).trim();
@@ -173,10 +174,7 @@ public class Peer implements ServiceInterface {
                     backupOpFiles.put(msg[2], tmpMap);
 
                     if(backupOpFiles.get(msg[2]).size() == (int) Math.ceil((double) fileSize / Utils.MAX_BYTE_MSG)) {
-                        byte[] finalFileBytes = new byte[backupOpFiles.get(msg[2]).size() * Utils.MAX_BYTE_MSG];
-                        for(int i = 0; i < backupOpFiles.get(msg[2]).size(); i++) {
-                            System.arraycopy(backupOpFiles.get(msg[2]).get(i), 0, finalFileBytes, (msgBytes.length - tmp) * i, backupOpFiles.get(msg[2]).get(i).length);
-                        }
+                        byte[] finalFileBytes = getFinalFileBytes(msgBytes, msg, tmp, backupOpFiles);
                         Backup backupProtocol = new Backup(msg[1], finalFileBytes, fileSize, peerID);
                         backupProtocol.performBackup(peerContainer);
                         backupOpFiles.remove(msg[2]);
@@ -196,6 +194,76 @@ public class Peer implements ServiceInterface {
                     return "Protocol operation finished";
                 }
             }
+            case "REQUESTRESTORE" -> {
+                System.out.println("This peer got the message: " + msg[0] + " " + msg[1] + " " + msg[2] + " " + msg[3]);
+                String filename = msg[1];
+                String address = msg[2];
+                String port = msg[3];
+
+                FileManager filemanager = null;
+                for (FileManager file : peerContainer.getBackedUpFiles())
+                    if (file.getFile().getName().equals(filename))
+                        filemanager = file;
+                if (filemanager == null)
+                    return "Unsuccessful RESTORE of file " + filename + ", this file does not exist on this peer's backup system";
+
+                return sendRestoreFile(address, port, filemanager);
+            }
+            case "GETRESTORE" -> {
+                System.out.println("This peer got the message: " + msg[0] + " " + msg[1] + " " + msg[2] + " " + msg[3]);
+                int tmp = msg[0].length() + msg[1].length() + msg[2].length() + msg[3].length() + 4;
+                long fileSize = Long.parseLong(msg[2]);
+                int numMsg = Integer.parseInt(msg[3]);
+                if (fileSize + tmp > Utils.MAX_BYTE_MSG) {
+                    byte[] fileBytes;
+
+                    long finalSize = fileSize;
+                    if((numMsg + 1) == (int) Math.ceil((double) fileSize / Utils.MAX_BYTE_MSG)) {
+                        while(finalSize > Utils.MAX_BYTE_MSG) finalSize -= Utils.MAX_BYTE_MSG;
+                        fileBytes = new byte[(int) finalSize + (tmp * numMsg)];
+                        System.arraycopy(msgBytes, tmp, fileBytes, 0, (int) finalSize + (tmp * numMsg));
+                    } else {
+                        fileBytes = new byte[msgBytes.length - tmp];
+                        System.arraycopy(msgBytes, tmp, fileBytes, 0, msgBytes.length - tmp);
+                    }
+
+                    int response_time = 50 * numMsg;
+
+                    try {
+                        Thread.sleep(response_time);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+
+                    ConcurrentHashMap<Integer, byte[]> tmpMap;
+                    if(restoreOpFiles.containsKey(msg[2])) tmpMap = restoreOpFiles.get(msg[2]);
+                    else tmpMap = new ConcurrentHashMap<>();
+
+                    tmpMap.put(numMsg, fileBytes);
+
+                    restoreOpFiles.put(msg[2], tmpMap);
+
+                    if(restoreOpFiles.get(msg[2]).size() == (int) Math.ceil((double) fileSize / Utils.MAX_BYTE_MSG)) {
+                        byte[] finalFileBytes = getFinalFileBytes(msgBytes, msg, tmp, restoreOpFiles);
+                        Restore restoreProtocol = new Restore("restored_" + msg[1], finalFileBytes, fileSize, peerID);
+                        restoreProtocol.performRestore(peerContainer);
+                        restoreOpFiles.remove(msg[2]);
+
+                        updatePeerContainerToMain();
+
+                        return "Protocol operation finished";
+                    }
+
+                    return "Awaiting further messages with file information";
+                } else {
+                    byte[] fileBytes = new byte[(int) fileSize];
+                    System.arraycopy(msgBytes, tmp, fileBytes, 0, (int) fileSize);
+
+                    Restore restoreProtocol = new Restore("restored_" + msg[1], fileBytes, fileSize, peerID);
+                    restoreProtocol.performRestore(peerContainer);
+                    return "Protocol operation finished";
+                }
+            }
             case "DELETE" -> {
                 System.out.println("This peer got the message: " + msg[0] + " " + msg[1]);
                 String filename = msg[1];
@@ -208,6 +276,14 @@ public class Peer implements ServiceInterface {
                 return "No response necessary";
             }
         }
+    }
+
+    private static byte[] getFinalFileBytes(byte[] msgBytes, String[] msg, int tmp, ConcurrentHashMap<String, ConcurrentHashMap<Integer, byte[]>> restoreOpFiles) {
+        byte[] finalFileBytes = new byte[restoreOpFiles.get(msg[2]).size() * Utils.MAX_BYTE_MSG];
+        for(int i = 0; i < restoreOpFiles.get(msg[2]).size(); i++) {
+            System.arraycopy(restoreOpFiles.get(msg[2]).get(i), 0, finalFileBytes, (msgBytes.length - tmp) * i, restoreOpFiles.get(msg[2]).get(i).length);
+        }
+        return finalFileBytes;
     }
 
     private static void updatePeerContainerToMain() {
@@ -291,6 +367,7 @@ public class Peer implements ServiceInterface {
                         filemanager.getFile().length(), Files.readAllBytes(Path.of(filemanager.getFile().getPath()))));
             } catch (IOException e) {
                 System.err.println("> Peer " + peerID + " exception: failed to read bytes of file");
+                return "error";
             }
         }
 
@@ -310,7 +387,42 @@ public class Peer implements ServiceInterface {
 
     @Override
     public String restore(String file_name) {
-        return null;
+        FileManager filemanager = null;
+        for (FileManager file : peerContainer.getStoredFiles())
+            if (file.getFile().getName().equals(file_name))
+                filemanager = file;
+        if (filemanager == null)
+            return "Unsuccessful RESTORE of file " + file_name + ", this file does not exist on this peer's file system";
+        if (!filemanager.isAlreadyBackedUp()) {
+            System.out.println("This file is not backed up, ignoring command");
+            return "Unsuccessful RESTORE of file " + file_name + ", this file has no backups in the network!";
+        }
+
+        String[] args = { String.valueOf(peerID), "RESTORE", file_name };
+        String message = formMessage(args);
+        String response = peerToMainChannel.sendMessageToMain(message, null);
+
+        String[] peers = response.split("=");
+
+        for (String peer : peers) {
+            String[] tmp = peer.split(":");
+            String address = tmp[0];
+            String port = tmp[1];
+            String result = peerToPeerChannel.sendRestoreMessageToPeer("REQUESTRESTORE", address, port, file_name, peerAddress, peerPort);
+            if(result.equals("Protocol operation finished")) return result;
+        }
+
+        return "Unsuccessful RESTORE of file " + file_name + ", no peers we're able to successfully reply with the file!";
+    }
+
+    public static String sendRestoreFile(String address, String port, FileManager file) {
+        try {
+            return peerToPeerChannel.sendMessageToPeer("GETRESTORE", address, port, file.getFile().getName(),
+                    file.getFile().length(), Files.readAllBytes(Path.of(file.getFile().getPath())));
+        } catch (IOException e) {
+            System.err.println("> Peer " + peerID + " exception: failed to read bytes of file");
+            return "error";
+        }
     }
 
     @Override
@@ -343,10 +455,14 @@ public class Peer implements ServiceInterface {
 
         int failedOps = 0;
         for (String r : results) {
-            if (r.equals("error")) {
+            if (r.equals("error"))
                 failedOps++;
-            }
+             else
+                filemanager.setActualReplicationDegree(filemanager.getActualReplicationDegree() - 1);
         }
+
+        filemanager.setDesiredReplicationDegree(-1);
+        filemanager.setAlreadyBackedUp(false);
 
         updatePeerContainerToMain();
 
@@ -354,10 +470,44 @@ public class Peer implements ServiceInterface {
         else return "DELETE operation finished";
     }
 
-
     @Override
     public String reclaim(long max_disk_space) {
-        return null;
+        long free_space = peerContainer.getFreeSpace();
+        long old_max_space = peerContainer.getMaxSpace();
+        long occupied_space = old_max_space - free_space;
+
+        peerContainer.setMaxSpace(max_disk_space);
+
+        while(occupied_space > max_disk_space) {
+            FileManager file = peerContainer.getBackedUpFiles().get(0);
+
+            String[] args = { String.valueOf(peerID), "RECLAIM", file.getFile().getName() };
+            String message = formMessage(args);
+            String peer = peerToMainChannel.sendMessageToMain(message, null);
+
+            String[] tmp = peer.split(":");
+            String address = tmp[0];
+            String port = tmp[1];
+
+            String result;
+
+            try {
+                result = peerToPeerChannel.sendMessageToPeer("BACKUP", address, port,
+                        file.getFile().getName(), file.getFile().length(), Files.readAllBytes(Path.of(file.getFile().getPath())));
+            } catch (IOException e) {
+                System.err.println("> Peer " + peerID + " exception: failed to read bytes of file");
+                return "error";
+            }
+
+            Delete deleteProtocol = new Delete(file.getFile().getName(), peerContainer);
+            deleteProtocol.performDelete();
+
+            occupied_space -= file.getFile().length();
+        }
+
+        peerContainer.setFreeSpace(max_disk_space - occupied_space);
+
+        return "RECLAIM operation finished";
     }
 
     @Override
@@ -415,15 +565,14 @@ public class Peer implements ServiceInterface {
         state.append(":::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::[n]");
         state.append(":::                           PEER STORAGE CAPACITY                           :::[n]");
         state.append(":::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::[n]");
-        state.append("::: TOTAL DISK SPACE: ").append(peerContainer.getMaxSpace()).append(" B");
-        spaceNum = 53 - String.valueOf(peerContainer.getMaxSpace()).length();
+        state.append("::: TOTAL DISK SPACE: ").append(peerContainer.getMaxSpace()).append(" Bytes");
+        spaceNum = 50 - String.valueOf(peerContainer.getMaxSpace()).length();
         state.append(space.repeat(spaceNum)).append(":::[n]");
-        state.append("::: FREE SPACE: ").append(peerContainer.getFreeSpace()).append(" B");
-        spaceNum = 59 - String.valueOf(peerContainer.getFreeSpace()).length();
+        state.append("::: FREE SPACE: ").append(peerContainer.getFreeSpace()).append(" Bytes");
+        spaceNum = 56 - String.valueOf(peerContainer.getFreeSpace()).length();
         state.append(space.repeat(spaceNum)).append(":::[n]");
         state.append(":::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::");
 
-        System.out.println(state);
         return state.toString();
     }
 
