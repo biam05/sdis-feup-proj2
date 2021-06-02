@@ -8,8 +8,10 @@ import java.net.StandardSocketOptions;
 import java.nio.ByteBuffer;
 import java.nio.channels.AsynchronousServerSocketChannel;
 import java.nio.channels.AsynchronousSocketChannel;
-import java.util.Arrays;
-import java.util.concurrent.*;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
 
 public class PeerChannel extends Thread {
     AsynchronousServerSocketChannel mainChannel;
@@ -148,8 +150,7 @@ public class PeerChannel extends Thread {
         String message = "INVALID";
         switch (op) {
             case "GETRESTORE", "BACKUP" -> message = op + ":" + file_name + ":" + fileSize + ":";
-            case "DELETE" -> message = op + ":" + file_name + ":";
-            case "REQUESTRESTORE" -> message = op + ":" + file_name + ":" + file_name + ":" + fileSize + ":";
+            case "DELETE", "DECREP" -> message = op + ":" + file_name + ":";
         }
         AsynchronousSocketChannel channel;
         try {

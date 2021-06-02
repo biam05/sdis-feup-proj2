@@ -52,26 +52,28 @@ public class PeerContainer implements Serializable {
      * Function used to load the state of the Peer Container
      */
     public synchronized void loadState() {
-        PeerContainer peerContainer;
-        try {
-            FileInputStream stateFileIn = new FileInputStream("peer " + peerID + "/state.ser");
-            ObjectInputStream in = new ObjectInputStream(stateFileIn);
-            peerContainer = (PeerContainer) in.readObject();
-            in.close();
-            stateFileIn.close();
-            System.out.println("> Peer " + peerID + ": Serialized state of peer loaded successfully");
-        } catch (Exception i) {
-            System.out.println("> Peer " + peerID + ": State file of peer not found, a new one will be created");
-            updateState();
-            saveState();
-            return;
-        }
+        peerContainerExecutors.execute(() -> {
+            PeerContainer peerContainer;
+            try {
+                FileInputStream stateFileIn = new FileInputStream("peer " + peerID + "/state.ser");
+                ObjectInputStream in = new ObjectInputStream(stateFileIn);
+                peerContainer = (PeerContainer) in.readObject();
+                in.close();
+                stateFileIn.close();
+                System.out.println("> Peer " + peerID + ": Serialized state of peer loaded successfully");
+            } catch (Exception i) {
+                System.out.println("> Peer " + peerID + ": State file of peer not found, a new one will be created");
+                updateState();
+                saveState();
+                return;
+            }
 
-        peerID = peerContainer.getPeerID();
-        storedFiles = peerContainer.getStoredFiles();
-        backedUpFiles = peerContainer.getBackedUpFiles();
-        maxSpace = peerContainer.getMaxSpace();
-        freeSpace = peerContainer.getFreeSpace();
+            peerID = peerContainer.getPeerID();
+            storedFiles = peerContainer.getStoredFiles();
+            backedUpFiles = peerContainer.getBackedUpFiles();
+            maxSpace = peerContainer.getMaxSpace();
+            freeSpace = peerContainer.getFreeSpace();
+        });
     }
 
     /**
@@ -153,34 +155,6 @@ public class PeerContainer implements Serializable {
      */
     public synchronized void addFreeSpace(long size) {
         this.freeSpace += size;
-        saveState();
-    }
-
-    /**
-     * Function used to add a FileManager to the Stored FileManager array
-     * 
-     * @param file FileManager that is gonna be stored
-     */
-    public synchronized void addStoredFile(FileManager file) {
-        for (FileManager storedFile : this.storedFiles) {
-            if (file.equals(storedFile))
-                return; // cant store equal files
-        }
-        this.storedFiles.add(file);
-        saveState();
-    }
-
-    /**
-     * Function used to add a FileManager to the BackedUp FileManager array
-     *
-     * @param file FileManager that is gonna be stored
-     */
-    public synchronized void addBackedUpFile(FileManager file) {
-        for (FileManager backedUpFile : this.backedUpFiles) {
-            if (file.equals(backedUpFile))
-                return; // cant store equal files
-        }
-        this.backedUpFiles.add(file);
         saveState();
     }
 

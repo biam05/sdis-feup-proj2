@@ -56,8 +56,7 @@ public class TestApp {
             System.exit(1);
             return;
         } catch( IOException e) {
-            System.out.println("SSLClient - Failed to create SSLSocket");
-            e.printStackTrace();
+            System.err.println("SSLClient - Failed to create SSLSocket, peer given might be offline");
             return;
         }
 
@@ -124,7 +123,10 @@ public class TestApp {
                 }
                 out.println(request.toUpperCase(Locale.ROOT));
             }
-            default -> System.err.println("TestApp: Invalid operation requested");
+            default -> {
+                System.err.println("TestApp: Invalid operation requested");
+                out.println("INVALID PROTOCOL");
+            }
         }
 
         try {
@@ -132,6 +134,12 @@ public class TestApp {
         } catch (IOException e) {
             System.err.println("SSLClient: Failed to read response!");
             e.printStackTrace();
+        }
+
+        if(response.equals("INVALID PROTOCOL")) {
+            System.out.println("SSLClient: invalid protocol given, ignoring");
+            clientSocket.close();
+            return;
         }
 
         response = response.replace("[n]", "\n");

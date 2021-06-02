@@ -20,11 +20,6 @@ public class MainPeer {
 
     private static ConcurrentHashMap<Integer, PeerContainer> peerContainers = new ConcurrentHashMap<>();
 
-    private static PeerChannel peerChannel;
-
-    private String peerAddress;
-    private int peerPort;
-
     private static final ScheduledThreadPoolExecutor mainPeerExecutors = new ScheduledThreadPoolExecutor(Utils.MAX_THREADS);
 
     public static void main(String[] args) {
@@ -38,6 +33,8 @@ public class MainPeer {
     }
 
     public MainPeer(String[] args){
+        String peerAddress;
+        int peerPort;
         try {
             peerAddress = args[0];
             peerPort = Integer.parseInt(args[1]);
@@ -50,7 +47,7 @@ public class MainPeer {
         createDirectory();
         loadState();
 
-        peerChannel = new PeerChannel(0, true, true, peerAddress, peerPort, null);
+        PeerChannel peerChannel = new PeerChannel(0, true, true, peerAddress, peerPort, null);
         peerChannel.start();
     }
 
@@ -60,7 +57,7 @@ public class MainPeer {
 
         String filename;
         int initiatorPeerID, rep_deg;
-        long fileSize, max_disk_space;
+        long fileSize;
         switch (msg[1].toUpperCase(Locale.ROOT)) {
             case "PEERCONTAINER" -> {
                 if (msg.length < 3) {
@@ -142,7 +139,20 @@ public class MainPeer {
                 initiatorPeerID = Integer.parseInt(msg[0]);
                 filename = msg[2];
                 fileSize = Long.parseLong(msg[3]);
-                String response = "";
+                StringBuilder response = new StringBuilder();
+
+                for(int peerID : peerContainers.keySet()) {
+                    if(peerID == initiatorPeerID) continue;
+                    PeerContainer tmp = peerContainers.get(peerID);
+                    for(FileManager fileManager : tmp.getStoredFiles()) {
+                        if(fileManager.getFile().getName().equals(filename)) {
+                            response.append(peerContainers.get(peerID).getPeerAddress());
+                            response.append("&");
+                            response.append(peerContainers.get(peerID).getPeerPort());
+                            response.append("|");
+                        }
+                    }
+                }
 
                 for(int peerID : peerContainers.keySet()) {
                     if(peerID == initiatorPeerID) continue;
@@ -161,12 +171,13 @@ public class MainPeer {
                         }
                     }
                     if(!hasFile && tmp.getFreeSpace() >= fileSize) {
-                        response = tmp.getPeerAddress() + ":" + tmp.getPeerPort();
-                        break;
+                        if(!response.toString().equals(""))
+                            response.append("=");
+                        response.append(tmp.getPeerAddress()).append(":").append(tmp.getPeerPort());
                     }
                 }
 
-                return response;
+                return response.toString();
             }
             default -> {
                 System.out.println("> Main peer got the following basic message: " + message);
@@ -182,6 +193,7 @@ public class MainPeer {
             if(peerID == initiatorPeerID) continue;
             PeerContainer tmp = peerContainers.get(peerID);
             for(FileManager fileManager : tmp.getBackedUpFiles()) {
+                System.out.println("PEER " + peerID + ": " + fileManager.getFile().getName());
                 if(fileManager.getFile().getName().equals(filename)) {
                     HashMap<String, Long> tmp2 = new HashMap<>();
                     tmp2.put(tmp.getPeerAddress(), tmp.getPeerPort());
@@ -244,7 +256,7 @@ public class MainPeer {
     /**
      * Function used to load the state of the MainPeer
      */
-    public synchronized void loadState() {
+    public static synchronized void loadState() {
         mainPeerExecutors.execute(() -> {
             ConcurrentHashMap<Integer, PeerContainer> peerContainers;
             try {

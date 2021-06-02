@@ -1,17 +1,14 @@
 package sdist1g21;
 
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.ObjectOutputStream;
+import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Locale;
-import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 public class Peer implements ServiceInterface {
@@ -28,17 +25,16 @@ public class Peer implements ServiceInterface {
 
     private static Peer peer;
 
-    private static SSLChannel sslChannel;
-
     private static PeerContainer peerContainer;
 
     private static PeerChannel peerToMainChannel;
     private static PeerChannel peerToPeerChannel;
 
-    private String mainPeerAddress, peerAddress;
-    private int mainPeerPort, peerPort;
+    private static final ScheduledThreadPoolExecutor peerExecutors = new ScheduledThreadPoolExecutor(Utils.MAX_THREADS);
+
+    private String peerAddress;
+    private int peerPort;
     private static int peerID;
-    private int SSLPort;
 
     public static void main(String[] args) {
         // check usage
@@ -51,6 +47,9 @@ public class Peer implements ServiceInterface {
     }
 
     public Peer(String[] args) {
+        String mainPeerAddress;
+        int mainPeerPort;
+        int SSLPort;
         try {
             peerID = Integer.parseInt(args[0]);
             peerAddress = args[1];
@@ -63,7 +62,7 @@ public class Peer implements ServiceInterface {
             return;
         }
 
-        sslChannel = new SSLChannel(SSLPort);
+        SSLChannel sslChannel = new SSLChannel(SSLPort);
         sslChannel.start();
 
         createDirectories();
@@ -77,10 +76,6 @@ public class Peer implements ServiceInterface {
         peerToPeerChannel.start();
 
         startAutoSave();
-    }
-
-    public static String getPeerPath(int pID) {
-        return "peer " + pID + "/";
     }
 
     public static String messageFromTestAppHandler(String message) {
@@ -123,7 +118,9 @@ public class Peer implements ServiceInterface {
             case "STATE" -> {
                 return peer.state();
             }
-
+            case "INVALID PROTOCOL" -> {
+                return "INVALID PROTOCOL";
+            }
             default -> System.err.println("> Peer " + peerID + " got the following basic message: " + message);
         }
         return "error";
@@ -179,6 +176,7 @@ public class Peer implements ServiceInterface {
                         Backup backupProtocol = new Backup(msg[1], finalFileBytes, fileSize, peerID);
                         backupProtocol.performBackup(peerContainer);
                         backupOpFiles.remove(msg[2]);
+                        peerContainer.updateState();
 
                         updatePeerContainerToMain();
 
@@ -192,6 +190,7 @@ public class Peer implements ServiceInterface {
 
                     Backup backupProtocol = new Backup(msg[1], fileBytes, fileSize, peerID);
                     backupProtocol.performBackup(peerContainer);
+                    peerContainer.updateState();
 
                     updatePeerContainerToMain();
 
@@ -252,6 +251,7 @@ public class Peer implements ServiceInterface {
                         Restore restoreProtocol = new Restore("restored_" + msg[1], finalFileBytes, fileSize, peerID);
                         restoreProtocol.performRestore(peerContainer);
                         restoreOpFiles.remove(msg[2]);
+                        peerContainer.updateState();
 
                         updatePeerContainerToMain();
 
@@ -265,14 +265,44 @@ public class Peer implements ServiceInterface {
 
                     Restore restoreProtocol = new Restore("restored_" + msg[1], fileBytes, fileSize, peerID);
                     restoreProtocol.performRestore(peerContainer);
+
+                    updatePeerContainerToMain();
+
                     return "Protocol operation finished";
                 }
             }
             case "DELETE" -> {
                 System.out.println("This peer got the message: " + msg[0] + " " + msg[1]);
                 String filename = msg[1];
+
                 Delete deleteProtocol = new Delete(filename, peerContainer);
                 deleteProtocol.performDelete();
+
+                updatePeerContainerToMain();
+
+                return "Protocol operation finished";
+            }
+            case "DECREP" -> {
+                System.out.println("This peer got the message: " + msg[0] + " " + msg[1]);
+                String filename = msg[1];
+
+                FileManager file = null;
+
+                for(FileManager f : peerContainer.getStoredFiles()) {
+                    if(f.getFile().getName().equals(filename))
+                        file = f;
+                }
+
+                if(file == null)
+                    return "Failed to decrement replication degree of file " + filename + ". This file does not exist on this peer!";
+
+                file.setActualReplicationDegree(file.getActualReplicationDegree() - 1);
+
+                if(file.getActualReplicationDegree() == 0)
+                    file.setAlreadyBackedUp(false);
+
+                updatePeerContainerToMain();
+
                 return "Protocol operation finished";
             }
             default -> {
@@ -291,20 +321,22 @@ public class Peer implements ServiceInterface {
     }
 
     private static void updatePeerContainerToMain() {
-        ByteArrayOutputStream bos = new ByteArrayOutputStream();
-        ObjectOutputStream out;
-        try {
-            out = new ObjectOutputStream(bos);
-            out.writeObject(peerContainer);
-            out.flush();
-            byte[] peerContainerBytes = bos.toByteArray();
+        peerExecutors.execute(() -> {
+            ByteArrayOutputStream bos = new ByteArrayOutputStream();
+            ObjectOutputStream out;
+            try {
+                out = new ObjectOutputStream(bos);
+                out.writeObject(peerContainer);
+                out.flush();
+                byte[] peerContainerBytes = bos.toByteArray();
 
-            bos.close();
-            peerToMainChannel.sendMessageToMain(peerID + ":PEERCONTAINER:", peerContainerBytes);
-        } catch (IOException e) {
-            System.err.println("PeerChannel exception: Failed to encode peerContainer!");
-            e.printStackTrace();
-        }
+                bos.close();
+                peerToMainChannel.sendMessageToMain(peerID + ":PEERCONTAINER:", peerContainerBytes);
+            } catch (IOException e) {
+                System.err.println("PeerChannel exception: Failed to encode peerContainer!");
+                e.printStackTrace();
+            }
+        });
     }
 
     /**
@@ -328,7 +360,7 @@ public class Peer implements ServiceInterface {
         Executors.newScheduledThreadPool(1).scheduleAtFixedRate(() -> {
                     peerContainer.updateState();
                     peerContainer.saveState();
-                }, 0, 2,
+                }, 0, 3,
                 TimeUnit.SECONDS);
     }
 
@@ -411,6 +443,9 @@ public class Peer implements ServiceInterface {
         String message = formMessage(args);
         String response = peerToMainChannel.sendMessageToMain(message, null);
 
+        if(response.equals("empty"))
+            return "RESTORE operation failed, no peers that hold the file have been found";
+
         String[] peers = response.split("=");
 
         for (String peer : peers) {
@@ -475,13 +510,16 @@ public class Peer implements ServiceInterface {
                 filemanager.setActualReplicationDegree(filemanager.getActualReplicationDegree() - 1);
         }
 
-        filemanager.setDesiredReplicationDegree(-1);
-        filemanager.setAlreadyBackedUp(false);
-
-        updatePeerContainerToMain();
-
-        if(failedOps > 0) return "DELETE operation finished but failed on " + failedOps + " peers";
-        else return "DELETE operation finished";
+        if(failedOps > 0) {
+            filemanager.setDesiredReplicationDegree(0);
+            updatePeerContainerToMain();
+            return "DELETE operation finished but failed on " + failedOps + " peer(s)";
+        } else {
+            filemanager.setDesiredReplicationDegree(-1);
+            filemanager.setAlreadyBackedUp(false);
+            updatePeerContainerToMain();
+            return "DELETE operation finished";
+        }
     }
 
     @Override
@@ -494,26 +532,52 @@ public class Peer implements ServiceInterface {
 
             String[] args = { String.valueOf(peerID), "RECLAIM", file.getFile().getName(), String.valueOf(file.getFile().length())};
             String message = formMessage(args);
-            String peer = peerToMainChannel.sendMessageToMain(message, null);
+            String response = peerToMainChannel.sendMessageToMain(message, null);
 
-            String[] tmp = peer.split(":");
-            String address = tmp[0];
-            String port = tmp[1];
+            String[] separate = response.split("\\|");
 
-            String result;
+            if(separate.length == 1) { // No avaliable peers for backup operation
+                String ownerPeerAddress = separate[0].split("&")[0];
+                String ownerPeerPort = separate[0].split("&")[1];
 
-            try {
-                result = peerToPeerChannel.sendMessageToPeer("BACKUP", address, port,
-                        file.getFile().getName(), file.getFile().length(), Files.readAllBytes(Path.of(file.getFile().getPath())));
-            } catch (IOException e) {
-                System.err.println("> Peer " + peerID + " exception: failed to read bytes of file");
-                return "error";
+                String result;
+
+                result = peerToPeerChannel.sendMessageToPeer("DECREP", ownerPeerAddress, ownerPeerPort,
+                        file.getFile().getName(), 0, null);
+
+                Delete deleteProtocol = new Delete(file.getFile().getName(), peerContainer);
+                deleteProtocol.performDelete();
+
+                peerContainer.addFreeSpace(file.getFile().length());
+
+                if(result.equals("Protocol operation finished")) System.out.println("File " + file.getFile().getName() + " deleted from Peer "
+                        + peerID + " but no avaliable peers we're found to save the file, owner peer was warned to decrement replication degree");
+                else System.out.println("File " + file.getFile().getName() + " deleted from Peer "
+                        + peerID + " but no avaliable peers we're found to save the file, tried to warn owner peer unsuccessfully");
+            } else {
+                response = response.substring(response.indexOf("|") + 1);
+                String[] peers = response.split("=");
+
+                for (String peer : peers) {
+                    String[] tmp = peer.split(":");
+                    String address = tmp[0];
+                    String port = tmp[1];
+                    String result;
+                    try {
+                        result = peerToPeerChannel.sendMessageToPeer("BACKUP", address, port,
+                                file.getFile().getName(), file.getFile().length(), Files.readAllBytes(Path.of(file.getFile().getPath())));
+                    } catch (IOException e) {
+                        System.err.println("> Peer " + peerID + " exception: failed to read bytes of file");
+                        return "error";
+                    }
+                    if(result.equals("Protocol operation finished")) break;
+                }
+
+                Delete deleteProtocol = new Delete(file.getFile().getName(), peerContainer);
+                deleteProtocol.performDelete();
+
+                peerContainer.addFreeSpace(file.getFile().length());
             }
-
-            Delete deleteProtocol = new Delete(file.getFile().getName(), peerContainer);
-            deleteProtocol.performDelete();
-
-            peerContainer.addFreeSpace(file.getFile().length());
         }
 
         updatePeerContainerToMain();
