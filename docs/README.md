@@ -29,12 +29,17 @@ Usage: `./peer.sh <peer_id> <peer_address> <peer_port> <SSLPort> <main_peer_addr
 
 3. `test.sh`: script used to run the different protocols
 
-    a. Backup Usage: `./test.sh <peer_address> <peer_port> BACKUP <filename> <rep degree>`
-    b. Restore Usage: `./test.sh <peer_address> <peer_port> RESTORE <filename>`
-    c. Delete Usage: `./test.sh <peer_address> <peer_port> DELETE <filename>`
-    d. Reclaim Usage: `./test.sh <peer_address> <peer_port> RECLAIM <max space>`
-    e. Peer State Usage: `./test.sh <peer_address> <peer_port> STATE`
-    f. Main Peer State Usage: `./test.sh <peer_address> <peer_port> MAINSTATE`
+a. Backup Usage: `./test.sh <peer_address> <peer_port> BACKUP <filename> <rep degree>`
+
+b. Restore Usage: `./test.sh <peer_address> <peer_port> RESTORE <filename>`
+
+c. Delete Usage: `./test.sh <peer_address> <peer_port> DELETE <filename>`
+
+d. Reclaim Usage: `./test.sh <peer_address> <peer_port> RECLAIM <max space>`
+
+e. Peer State Usage: `./test.sh <peer_address> <peer_port> STATE`
+
+f. Main Peer State Usage: `./test.sh <peer_address> <peer_port> MAINSTATE`
 
 4. `cleanup.sh`: script used to restart the state and backed up files from a given peer, can be used to cleanup the Main Peer as well by inputting "MainPeer" as _peer_id_
 
