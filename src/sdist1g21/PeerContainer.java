@@ -87,12 +87,6 @@ public class PeerContainer implements Serializable {
                             "peer " + peerID + "/files/" + filePath.getFileName().toString(), 0);
                     if (!storedFiles.contains(fileManager)) {
                         storedFiles.add(fileManager);
-                        /*try {
-                            freeSpace -= Files.size(filePath);
-                        } catch (IOException e) {
-                            System.err.println("> Peer " + peerID + ": Failed to get size of file: "
-                                    + fileManager.getFile().getName());
-                        }*/
                     }
                 }
             });

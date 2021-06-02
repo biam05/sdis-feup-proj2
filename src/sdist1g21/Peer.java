@@ -175,6 +175,7 @@ public class Peer implements ServiceInterface {
 
                     if(backupOpFiles.get(msg[2]).size() == (int) Math.ceil((double) fileSize / Utils.MAX_BYTE_MSG)) {
                         byte[] finalFileBytes = getFinalFileBytes(msgBytes, msg, tmp, backupOpFiles);
+
                         Backup backupProtocol = new Backup(msg[1], finalFileBytes, fileSize, peerID);
                         backupProtocol.performBackup(peerContainer);
                         backupOpFiles.remove(msg[2]);
@@ -191,6 +192,9 @@ public class Peer implements ServiceInterface {
 
                     Backup backupProtocol = new Backup(msg[1], fileBytes, fileSize, peerID);
                     backupProtocol.performBackup(peerContainer);
+
+                    updatePeerContainerToMain();
+
                     return "Protocol operation finished";
                 }
             }
@@ -321,8 +325,10 @@ public class Peer implements ServiceInterface {
      * auto-saves the state of the peer every 3 seconds
      */
     private synchronized void startAutoSave() {
-        peerContainer.updateState();
-        Executors.newScheduledThreadPool(1).scheduleAtFixedRate(() -> peerContainer.saveState(), 0, 3,
+        Executors.newScheduledThreadPool(1).scheduleAtFixedRate(() -> {
+                    peerContainer.updateState();
+                    peerContainer.saveState();
+                }, 0, 2,
                 TimeUnit.SECONDS);
     }
 
@@ -353,6 +359,9 @@ public class Peer implements ServiceInterface {
                 String.valueOf(filemanager.getFile().length()) };
         String message = formMessage(args);
         String response = peerToMainChannel.sendMessageToMain(message, null);
+
+        if(response.equals("empty"))
+            return "BACKUP operation failed, there are no peers available to backup the file";
 
         String[] peers = response.split("=");
 
@@ -412,6 +421,8 @@ public class Peer implements ServiceInterface {
             if(result.equals("Protocol operation finished")) return result;
         }
 
+        updatePeerContainerToMain();
+
         return "Unsuccessful RESTORE of file " + file_name + ", no peers we're able to successfully reply with the file!";
     }
 
@@ -441,6 +452,9 @@ public class Peer implements ServiceInterface {
         String[] args = { String.valueOf(peerID), "DELETE", file_name };
         String message = formMessage(args);
         String response = peerToMainChannel.sendMessageToMain(message, null);
+
+        if(response.equals("empty"))
+            return "DELETE operation failed, none of the peers that hold the file are online";
 
         String[] peers = response.split("=");
 
@@ -472,16 +486,13 @@ public class Peer implements ServiceInterface {
 
     @Override
     public String reclaim(long max_disk_space) {
-        long free_space = peerContainer.getFreeSpace();
-        long old_max_space = peerContainer.getMaxSpace();
-        long occupied_space = old_max_space - free_space;
-
+        peerContainer.setFreeSpace(max_disk_space - (peerContainer.getMaxSpace() - peerContainer.getFreeSpace()));
         peerContainer.setMaxSpace(max_disk_space);
 
-        while(occupied_space > max_disk_space) {
+        while(peerContainer.getFreeSpace() < 0) {
             FileManager file = peerContainer.getBackedUpFiles().get(0);
 
-            String[] args = { String.valueOf(peerID), "RECLAIM", file.getFile().getName() };
+            String[] args = { String.valueOf(peerID), "RECLAIM", file.getFile().getName(), String.valueOf(file.getFile().length())};
             String message = formMessage(args);
             String peer = peerToMainChannel.sendMessageToMain(message, null);
 
@@ -502,23 +513,23 @@ public class Peer implements ServiceInterface {
             Delete deleteProtocol = new Delete(file.getFile().getName(), peerContainer);
             deleteProtocol.performDelete();
 
-            occupied_space -= file.getFile().length();
+            peerContainer.addFreeSpace(file.getFile().length());
         }
 
-        peerContainer.setFreeSpace(max_disk_space - occupied_space);
+        updatePeerContainerToMain();
 
         return "RECLAIM operation finished";
     }
 
     @Override
     public String state() {
-        int nFile = 1, spaceNum = 0;
+        int nFile = 1, spaceNum;
         String space = " ";
         StringBuilder state = new StringBuilder();
         state.append(":::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::[n]");
         state.append(":::                                   PEER ").append(peerID).append("                                  :::[n]");
         state.append(":::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::[n]");
-        state.append(":::                            OWN BACKED UP FILES                            :::[n]");
+        state.append(":::                                 OWN FILES                                 :::[n]");
         // each file whose backup has initiated
         for(FileManager fileManager : peerContainer.getStoredFiles()){
             if(fileManager.isAlreadyBackedUp()) {

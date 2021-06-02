@@ -36,7 +36,6 @@ public class Backup {
     public synchronized void performBackup(PeerContainer peerContainer) {
         try {
             FileManager backedUpFile = new FileManager("peer " + pID + "/" + "backups/" + filename, -1);
-            peerContainer.addBackedUpFile(backedUpFile);
             Path path = Path.of("peer " + pID + "/" + "backups/" + filename);
             saveFile(peerContainer, backedUpFile, path, content, pID, filename);
         } catch (IOException e) {

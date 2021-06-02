@@ -35,7 +35,6 @@ public class Restore {
     public synchronized void performRestore(PeerContainer peerContainer) {
         try {
             FileManager restoredFile = new FileManager("peer " + pID + "/" + "files/" + filename, -1);
-            peerContainer.addStoredFile(restoredFile);
             Path path = Path.of("peer " + pID + "/" + "files/" + filename);
             Backup.saveFile(peerContainer, restoredFile, path, content, pID, filename);
         } catch (IOException e) {

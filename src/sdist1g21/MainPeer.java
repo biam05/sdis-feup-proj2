@@ -141,6 +141,7 @@ public class MainPeer {
                 }
                 initiatorPeerID = Integer.parseInt(msg[0]);
                 filename = msg[2];
+                fileSize = Long.parseLong(msg[3]);
                 String response = "";
 
                 for(int peerID : peerContainers.keySet()) {
@@ -159,7 +160,7 @@ public class MainPeer {
                             break;
                         }
                     }
-                    if(!hasFile) {
+                    if(!hasFile && tmp.getFreeSpace() >= fileSize) {
                         response = tmp.getPeerAddress() + ":" + tmp.getPeerPort();
                         break;
                     }
