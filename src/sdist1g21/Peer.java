@@ -274,6 +274,19 @@ public class Peer implements ServiceInterface {
             case "DELETE" -> {
                 System.out.println("This peer got the message: " + msg[0] + " " + msg[1]);
                 String filename = msg[1];
+                FileManager file = null;
+
+                for (FileManager f : peerContainer.getBackedUpFiles()) {
+                    if (f.getFile().getName().equals(filename)) {
+                        file = f;
+                        break;
+                    }
+                }
+
+                if(file == null)
+                    return "Failed to delete file " + filename + ". This file does not exist on this peer!";
+
+                peerContainer.addFreeSpace(file.getFile().length());
 
                 Delete deleteProtocol = new Delete(filename, peerContainer);
                 deleteProtocol.performDelete();
@@ -344,8 +357,8 @@ public class Peer implements ServiceInterface {
      */
     private void createDirectories() {
         try {
-            Files.createDirectories(Paths.get("peer " + peerID + "\\files"));
-            Files.createDirectories(Paths.get("peer " + peerID + "\\backups"));
+            Files.createDirectories(Paths.get("peer " + peerID + "/files"));
+            Files.createDirectories(Paths.get("peer " + peerID + "/backups"));
         } catch (Exception e) {
             System.err.println("> Peer " + peerID + " exception: failed to create peer directory");
         }

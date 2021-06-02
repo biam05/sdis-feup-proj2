@@ -72,7 +72,8 @@ public class TestApp {
                 System.out.println("> TestApp: BACKUP Operation");
                 if (args.length != 5) {
                     System.err.println("Wrong number of arguments given for BACKUP operation");
-                    return;
+                    out.println("INVALID PROTOCOL");
+                    break;
                 }
                 String file_name = args[3];
                 int replicationDegree;
@@ -80,7 +81,8 @@ public class TestApp {
                     replicationDegree = Integer.parseInt(args[4]);
                 } catch (NumberFormatException e) {
                     System.err.println("Replication degree given is not a number!");
-                    return;
+                    out.println("INVALID PROTOCOL");
+                    break;
                 }
                 out.println(request.toUpperCase(Locale.ROOT) + ":" + file_name + ":" + replicationDegree);
             }
@@ -89,7 +91,8 @@ public class TestApp {
                 System.out.println("> TestApp: RESTORE Operation");
                 if (args.length != 4) {
                     System.err.println("Wrong number of arguments given for RESTORE operation");
-                    return;
+                    out.println("INVALID PROTOCOL");
+                    break;
                 }
                 String file_name = args[3];
                 out.println(request.toUpperCase(Locale.ROOT) + ":" + file_name);
@@ -99,7 +102,8 @@ public class TestApp {
                 System.out.println("> TestApp: DELETE Operation");
                 if (args.length != 4) {
                     System.err.println("Wrong number of arguments given for DELETE operation");
-                    return;
+                    out.println("INVALID PROTOCOL");
+                    break;
                 }
                 String file_name = args[3];
                 out.println(request.toUpperCase(Locale.ROOT) + ":" + file_name);
@@ -109,7 +113,8 @@ public class TestApp {
                 System.out.println("> TestApp: RECLAIM Operation");
                 if (args.length != 4){
                     System.err.println("Wrong number of arguments given for RECLAIM operation");
-                    return;
+                    out.println("INVALID PROTOCOL");
+                    break;
                 }
                 int max_space = Integer.parseInt(args[3]);
                 out.println(request.toUpperCase(Locale.ROOT) + ":" + max_space);
@@ -119,7 +124,8 @@ public class TestApp {
                 System.out.println("> TestApp: STATE Operation");
                 if (args.length != 3){
                     System.err.println("Wrong number of arguments given for STATE operation");
-                    return;
+                    out.println("INVALID PROTOCOL");
+                    break;
                 }
                 out.println(request.toUpperCase(Locale.ROOT));
             }

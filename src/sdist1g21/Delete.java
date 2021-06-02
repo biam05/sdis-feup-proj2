@@ -26,10 +26,7 @@ public class Delete {
         ArrayList<FileManager> toBeDeleted = new ArrayList<>();
         for (FileManager file : peerContainer.getBackedUpFiles()) {
             if (file.getFile().getName().equals(filename)) {
-                peerContainer.addFreeSpace(file.getFile().length());
-                Executors.newScheduledThreadPool(5).schedule(() -> {
-                    peerContainer.deleteStoredBackupFile(file);
-                }, 0, TimeUnit.SECONDS);
+                Executors.newScheduledThreadPool(5).schedule(() -> peerContainer.deleteStoredBackupFile(file), 0, TimeUnit.SECONDS);
                 toBeDeleted.add(file);
             }
         }

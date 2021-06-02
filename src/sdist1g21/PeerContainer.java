@@ -98,12 +98,6 @@ public class PeerContainer implements Serializable {
                             "peer " + peerID + "/backups/" + filePath.getFileName().toString(), 0);
                     if (!backedUpFiles.contains(fileManager)) {
                         backedUpFiles.add(fileManager);
-                        try {
-                            freeSpace -= Files.size(filePath);
-                        } catch (IOException e) {
-                            System.err.println("> Peer " + peerID + ": Failed to get size of file: "
-                                    + fileManager.getFile().getName());
-                        }
                     }
                 }
             });
@@ -165,7 +159,7 @@ public class PeerContainer implements Serializable {
      */
     public synchronized void deleteStoredBackupFile(FileManager file) {
         try {
-            Files.deleteIfExists(Path.of("peer " + peerID + "\\" + "backups\\" + file.getFile().getName()));
+            Files.deleteIfExists(Path.of("peer " + peerID + "/" + "backups/" + file.getFile().getName()));
             System.out.println("> Peer " + peerID + ": DELETE of file " + file.getFile().getName() + " finished");
         } catch (IOException e) {
             System.err.println("> Peer " + peerID + ": Failed to delete file " + file.getFile().getName());

@@ -193,7 +193,6 @@ public class MainPeer {
             if(peerID == initiatorPeerID) continue;
             PeerContainer tmp = peerContainers.get(peerID);
             for(FileManager fileManager : tmp.getBackedUpFiles()) {
-                System.out.println("PEER " + peerID + ": " + fileManager.getFile().getName());
                 if(fileManager.getFile().getName().equals(filename)) {
                     HashMap<String, Long> tmp2 = new HashMap<>();
                     tmp2.put(tmp.getPeerAddress(), tmp.getPeerPort());
