@@ -34,4 +34,79 @@ public class Utils {
             throw new RuntimeException(e);
         }
     }
+
+    public static int calculatePathSpaceSize(int nFile, String space, StringBuilder state, FileManager fileManager) {
+        int spaceNum;
+        state.append("::: PATH: ").append(fileManager.getFile().getPath());
+        spaceNum = 68 - fileManager.getFile().getPath().length();
+        state.append(space.repeat(spaceNum)).append(":::[n]");
+        state.append("::: FILE_ID: ").append(fileManager.getFileID()).append(" :::[n]");
+        nFile++;
+        return nFile;
+    }
+
+    public static String peerState(int peerID, PeerContainer peerContainer){
+        int nFile = 1, spaceNum;
+        String space = " ";
+        StringBuilder state = new StringBuilder();
+        state.append(":::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::[n]");
+        state.append(":::                                   PEER ").append(peerID).append("                                  :::[n]");
+        state.append(":::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::[n]");
+        state.append(":::                                 OWN FILES                                 :::[n]");
+        // each file whose backup has initiated
+        for(FileManager fileManager : peerContainer.getStoredFiles()){
+            if(fileManager.isAlreadyBackedUp()) {
+                state.append(":::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::[n]");
+                state.append("::: FILE ").append(nFile).append("                                                                    :::[n]");
+                state.append(":::                                                                           :::[n]");
+                state.append("::: IS BACKED UP: YES").append("                                                         :::[n]");
+                state.append("::: PATH: ").append(fileManager.getFile().getPath());
+                spaceNum = 68 - fileManager.getFile().getPath().length();
+                state.append(space.repeat(spaceNum)).append(":::[n]");
+                state.append("::: FILE_ID: ").append(fileManager.getFileID()).append(" :::[n]");
+                state.append("::: DESIRED REPLICATION DEGREE: ").append(fileManager.getDesiredReplicationDegree()).append("                                             :::[n]");
+                state.append("::: CURRENT REPLICATION DEGREE: ").append(fileManager.getActualReplicationDegree()).append("                                             :::[n]");
+                nFile++;
+            } else {
+                state.append(":::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::[n]");
+                state.append("::: FILE ").append(nFile).append("                                                                    :::[n]");
+                state.append(":::                                                                           :::[n]");
+                state.append("::: IS BACKED UP: NO").append("                                                          :::[n]");
+                nFile = Utils.calculatePathSpaceSize(nFile, space, state, fileManager);
+            }
+        }
+        if(nFile == 1){
+            state.append(":::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::[n]");
+            state.append("::: NO STORED FILES                                                           :::[n]");
+        }
+        nFile = 1;
+
+        // backed up files from other peers
+        state.append(":::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::[n]");
+        state.append(":::                           OTHER BACKED UP FILES                           :::[n]");
+        for(FileManager fileManager : peerContainer.getBackedUpFiles()){
+            state.append(":::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::[n]");
+            state.append("::: FILE ").append(nFile).append("                                                                    :::[n]");
+            state.append(":::                                                                           :::[n]");
+            nFile = Utils.calculatePathSpaceSize(nFile, space, state, fileManager);
+        }
+        if(nFile == 1){
+            state.append(":::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::[n]");
+            state.append("::: NO BACKED UP FILES FROM OTHER PEERS                                       :::[n]");
+        }
+
+        // peer storage capacity
+        state.append(":::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::[n]");
+        state.append(":::                           PEER STORAGE CAPACITY                           :::[n]");
+        state.append(":::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::[n]");
+        state.append("::: TOTAL DISK SPACE: ").append(peerContainer.getMaxSpace()).append(" Bytes");
+        spaceNum = 50 - String.valueOf(peerContainer.getMaxSpace()).length();
+        state.append(space.repeat(spaceNum)).append(":::[n]");
+        state.append("::: FREE SPACE: ").append(peerContainer.getFreeSpace()).append(" Bytes");
+        spaceNum = 56 - String.valueOf(peerContainer.getFreeSpace()).length();
+        state.append(space.repeat(spaceNum)).append(":::[n]");
+        state.append(":::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::");
+
+        return state.toString();
+    }
 }

@@ -179,6 +179,9 @@ public class MainPeer {
 
                 return response.toString();
             }
+            case "STATE" -> {
+                return state();
+            }
             default -> {
                 System.out.println("> Main peer got the following basic message: " + message);
                 return "nothing";
@@ -274,4 +277,18 @@ public class MainPeer {
             MainPeer.peerContainers = peerContainers;
         });
     }
+
+    public static String state(){
+        StringBuilder state = new StringBuilder();
+        state.append(":::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::[n]");
+        state.append(":::                          MAIN PEER INFORMATION                            :::[n]");
+        state.append(":::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::[n]");
+        for(int peerID : peerContainers.keySet()){
+            PeerContainer peerContainer = peerContainers.get(peerID);
+            state.append(Utils.peerState(peerID, peerContainer));
+        }
+        return state.toString();
+    }
+
+
 }
