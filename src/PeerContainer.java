@@ -92,6 +92,10 @@ public class PeerContainer implements Serializable {
                     }
                 }
             });
+            for(FileManager file : storedFiles) {
+                File tempFile = new File("peer " + peerID + "/files/" + file.getFile().getName());
+                if(!tempFile.exists()) storedFiles.remove(file);
+            }
             Files.walk(Paths.get("peer " + peerID + "/backups")).forEach(filePath -> {
                 if (!filePath.toFile().isDirectory()) {
                     FileManager fileManager = new FileManager(

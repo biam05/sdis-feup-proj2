@@ -474,7 +474,7 @@ public class Peer implements ServiceInterface {
 
         updatePeerContainerToMain();
 
-        return "Unsuccessful RESTORE of file " + file_name + ", no peers we're able to successfully reply with the file!";
+        return "Unsuccessful RESTORE of file " + file_name + ", no peers were able to successfully reply with the file!";
     }
 
     public static String sendRestoreFile(String address, String port, FileManager file) {
@@ -567,9 +567,9 @@ public class Peer implements ServiceInterface {
                 peerContainer.addFreeSpace(file.getFile().length());
 
                 if(result.equals("Protocol operation finished")) System.out.println("File " + file.getFile().getName() + " deleted from Peer "
-                        + peerID + " but no avaliable peers we're found to save the file, owner peer was warned to decrement replication degree");
+                        + peerID + " but no avaliable peers were found to save the file, owner peer was warned to decrement replication degree");
                 else System.out.println("File " + file.getFile().getName() + " deleted from Peer "
-                        + peerID + " but no avaliable peers we're found to save the file, tried to warn owner peer unsuccessfully");
+                        + peerID + " but no avaliable peers were found to save the file, tried to warn owner peer unsuccessfully");
             } else {
                 response = response.substring(response.indexOf("|") + 1);
                 String[] peers = response.split("=");
