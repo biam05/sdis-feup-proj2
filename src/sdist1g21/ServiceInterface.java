@@ -6,4 +6,5 @@ public interface ServiceInterface {
     String delete(String file_name);
     String reclaim(long max_disk_space);
     String state();
+    String mainState();
 }

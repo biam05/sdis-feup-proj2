@@ -283,9 +283,11 @@ public class MainPeer {
         state.append(":::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::[n]");
         state.append(":::                          MAIN PEER INFORMATION                            :::[n]");
         state.append(":::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::[n]");
+        state.append("[n]");
         for(int peerID : peerContainers.keySet()){
             PeerContainer peerContainer = peerContainers.get(peerID);
             state.append(Utils.peerState(peerID, peerContainer));
+            state.append("[n][n]");
         }
         return state.toString();
     }

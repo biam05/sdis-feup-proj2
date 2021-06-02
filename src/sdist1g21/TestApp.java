@@ -119,11 +119,21 @@ public class TestApp {
                 int max_space = Integer.parseInt(args[3]);
                 out.println(request.toUpperCase(Locale.ROOT) + ":" + max_space);
             }
-            // Get Internal State
+            // Get Internal State a Peer
             case "STATE" -> {
                 System.out.println("> TestApp: STATE Operation");
                 if (args.length != 3){
                     System.err.println("Wrong number of arguments given for STATE operation");
+                    out.println("INVALID PROTOCOL");
+                    break;
+                }
+                out.println(request.toUpperCase(Locale.ROOT));
+            }
+            // Get Internal State of Main Peer
+            case "MAINSTATE" -> {
+                System.out.println("> TestApp: MAINSTATE Operation");
+                if (args.length != 3){
+                    System.err.println("Wrong number of arguments given for MAINSTATE operation");
                     out.println("INVALID PROTOCOL");
                     break;
                 }

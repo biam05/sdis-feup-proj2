@@ -118,6 +118,9 @@ public class Peer implements ServiceInterface {
             case "STATE" -> {
                 return peer.state();
             }
+            case "MAINSTATE" -> {
+                return peer.mainState();
+            }
             case "INVALID PROTOCOL" -> {
                 return "INVALID PROTOCOL";
             }
@@ -603,4 +606,10 @@ public class Peer implements ServiceInterface {
         return Utils.peerState(peerID, peerContainer);
     }
 
+    @Override
+    public String mainState() {
+        String[] args = { String.valueOf(peerID), "STATE" };
+        String message = formMessage(args);
+        return peerToMainChannel.sendMessageToMain(message, null);
+    }
 }

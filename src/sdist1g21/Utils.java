@@ -45,7 +45,7 @@ public class Utils {
         return nFile;
     }
 
-    public static String peerState(int peerID, PeerContainer peerContainer){
+    public static String peerState(int peerID, PeerContainer peerContainer) {
         int nFile = 1, spaceNum;
         String space = " ";
         StringBuilder state = new StringBuilder();
